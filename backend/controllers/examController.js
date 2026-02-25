@@ -1,5 +1,7 @@
 const Exam = require("../models/Exam");
 const Category = require("../models/Category");
+const Syllabus = require("../models/Syllabus");
+const MockTest = require("../models/MockTest");
 
 /**
  * HELPER: Generate Next ID (Non-reusable)
@@ -27,6 +29,7 @@ exports.createExam = async (req, res) => {
     const exam = new Exam({
       examCode,
       examName: req.body.examName,
+      status: (req.body.status || "ACTIVE").toUpperCase(),
       description: req.body.description,
     });
 
@@ -64,6 +67,7 @@ exports.updateExam = async (req, res) => {
       req.params.id,
       {
         examName: req.body.examName,
+        status: (req.body.status || "ACTIVE").toUpperCase(),
         description: req.body.description,
       },
       { new: true }
@@ -89,6 +93,8 @@ exports.deleteExam = async (req, res) => {
     // 2. Delete all Categories that belong to this Exam Name
     // This ensures your Category Master stays clean
     await Category.deleteMany({ examName: exam.examName });
+    await Syllabus.deleteMany({ examCode: exam.examCode });
+    await MockTest.deleteMany({ examCode: exam.examCode });
 
     // 3. Delete the Exam itself
     await Exam.findByIdAndDelete(req.params.id);

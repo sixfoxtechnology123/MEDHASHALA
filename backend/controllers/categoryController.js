@@ -1,5 +1,7 @@
 const Category = require("../models/Category");
 const Exam = require("../models/Exam");
+const Syllabus = require("../models/Syllabus");
+const MockTest = require("../models/MockTest");
 const mongoose = require("mongoose");
 
 const generateNextCategoryId = async () => {
@@ -22,7 +24,7 @@ exports.getNextCategoryId = async (req, res) => {
 
 exports.upsertCategory = async (req, res) => {
   try {
-    const { id, catId, examId, catName, features = [] } = req.body;
+    const { id, catId, examId, catName, features = [], status = "ACTIVE" } = req.body;
 
     if (!examId || !mongoose.isValidObjectId(examId)) {
       return res.status(400).json({ success: false, message: "VALID EXAM REQUIRED" });
@@ -40,6 +42,7 @@ exports.upsertCategory = async (req, res) => {
     const categoryData = {
       catName,
       features,
+      status: String(status).toUpperCase() === "INACTIVE" ? "INACTIVE" : "ACTIVE",
       examName: selectedExam.examName,
       examCode: selectedExam.examCode,
     };
@@ -82,7 +85,17 @@ exports.getAllCategories = async (req, res) => {
 // 4. DELETE
 exports.deleteCategory = async (req, res) => {
   try {
-    await Category.findByIdAndDelete(req.params.id);
+    const deleted = await Category.findByIdAndDelete(req.params.id);
+    if (deleted) {
+      await Syllabus.deleteMany({
+        examCode: deleted.examCode,
+        catId: deleted.catId,
+      });
+      await MockTest.deleteMany({
+        examCode: deleted.examCode,
+        categoryCode: deleted.catId,
+      });
+    }
     res.json({ success: true, message: "DELETED" });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

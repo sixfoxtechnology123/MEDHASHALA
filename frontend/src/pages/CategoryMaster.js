@@ -19,7 +19,8 @@ const CategoryMaster = () => {
     catId: "", 
     examId: "", 
     catName: "", 
-    features: [] 
+    features: [],
+    status: "ACTIVE",
   });
 
   const featureOptions = ["SYLLABUS", "MOCK TEST", "PYQ", "STUDY MATERIAL", "VIDEOS"];
@@ -64,7 +65,7 @@ const CategoryMaster = () => {
 
   const openAddForm = () => {
     setEditId(null);
-    setFormData({ catId: "", examId: "", catName: "", features: [] });
+    setFormData({ catId: "", examId: "", catName: "", features: [], status: "ACTIVE" });
     fetchData();
     setIsFormOpen(true);
   };
@@ -82,7 +83,8 @@ const CategoryMaster = () => {
       catId: cat.catId,
       examId: matchedExam?._id || "",
       catName: cat.catName,
-      features: cat.features || []
+      features: cat.features || [],
+      status: cat.status || "ACTIVE",
     });
     setIsFormOpen(true);
   };
@@ -127,7 +129,8 @@ const CategoryMaster = () => {
   const filteredCategories = categories.filter(c => 
     c.catName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (c.examName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (c.examCode || "").toLowerCase().includes(searchTerm.toLowerCase())
+    (c.examCode || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (c.status || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -191,12 +194,13 @@ const CategoryMaster = () => {
                 <th className="p-2">Exam</th>
                 <th className="p-2">Category Name</th>
                 <th className="p-2">Features</th>
+                <th className="p-2">Status</th>
                 <th className="p-2 text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {loading ? (
-                <tr><td colSpan="5" className="p-20 text-center animate-pulse font-black text-slate-300 uppercase">Loading Records...</td></tr>
+                <tr><td colSpan="6" className="p-20 text-center animate-pulse font-black text-slate-300 uppercase">Loading Records...</td></tr>
               ) : filteredCategories.map(cat => (
                 <tr key={cat._id} className="hover:bg-blue-50/30 transition-all">
                   <td className="p-2 font-black text-blue-600 text-sm">{cat.catId}</td>
@@ -210,6 +214,17 @@ const CategoryMaster = () => {
                         <span key={f} className="px-2 py-1 bg-slate-100 text-slate-900 rounded-md text-[9px] font-bold">{f}</span>
                       ))}
                     </div>
+                  </td>
+                  <td className="p-2">
+                    <span
+                      className={`px-2 py-1 rounded-md text-[9px] font-black uppercase ${
+                        cat.status === "INACTIVE"
+                          ? "bg-red-100 text-red-600"
+                          : "bg-emerald-100 text-emerald-700"
+                      }`}
+                    >
+                      {cat.status || "ACTIVE"}
+                    </span>
                   </td>
                   <td className="p-2 flex justify-center gap-2">
                     <button onClick={() => handleEdit(cat)} className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all">
@@ -248,16 +263,16 @@ const CategoryMaster = () => {
             <div className="space-y-5">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-[9px] font-black uppercase text-slate-900 mb-1 block">Category ID</label>
-                  <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl font-black text-blue-600 text-sm">
+                  <label className="text-sm font-semibold text-slate-900 mb-1 block">Category ID</label>
+                  <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-blue-600 text-[11px]">
                     {formData.catId || "..."}
                   </div>
                 </div>
                 <div>
-                  <label className="text-[9px] font-black uppercase text-slate-900 mb-1 block">Parent Exam</label>
+                  <label className="text-sm font-semibold text-slate-900 mb-1 block">Parent Exam</label>
                   <select 
                     required
-                    className="w-full p-3 bg-white border border-slate-200 rounded-xl font-black text-xs outline-none focus:border-blue-600 uppercase"
+                    className="w-full p-3 bg-white border border-slate-200 rounded-xl font-semibold text-[11px] outline-none focus:border-blue-600"
                     value={formData.examId}
                     onChange={(e) => setFormData({...formData, examId: e.target.value})}
                   >
@@ -272,25 +287,25 @@ const CategoryMaster = () => {
               </div>
 
               <div>
-                <label className="text-[9px] font-black uppercase text-slate-900 mb-1 block">Category Name</label>
+                <label className="text-sm font-semibold text-slate-900 mb-1 block">Category Name</label>
                 <input 
                   required
                   type="text"
-                  className="w-full p-3 border border-slate-200 rounded-xl font-black text-xs outline-none focus:border-blue-600 uppercase"
+                  className="w-full p-3 border border-slate-200 rounded-xl font-semibold text-[11px] outline-none focus:border-blue-600"
                   value={formData.catName}
                   onChange={(e) => setFormData({...formData, catName: e.target.value.toUpperCase()})}
                 />
               </div>
 
               <div>
-                <label className="text-[9px] font-black uppercase text-slate-900 mb-3 block">Features</label>
+                <label className="text-sm font-semibold text-slate-900 mb-3 block">Features</label>
                 <div className="flex flex-wrap gap-2">
                   {featureOptions.map(f => (
                     <button
                       key={f}
                       type="button"
                       onClick={() => toggleFeature(f)}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all font-black text-[9px] ${
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all font-semibold text-[11px] ${
                         formData.features.includes(f) 
                         ? "bg-blue-600 border-blue-600 text-white shadow-md" 
                         : "bg-white border-slate-200 text-slate-900"
@@ -303,11 +318,23 @@ const CategoryMaster = () => {
                 </div>
               </div>
 
+              <div>
+                <label className="text-sm font-semibold text-slate-900 mb-1 block">Status</label>
+                <select
+                  className="w-full p-3 bg-white border border-slate-200 rounded-xl font-semibold text-[11px] outline-none focus:border-blue-600"
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                >
+                  <option value="ACTIVE">ACTIVE</option>
+                  <option value="INACTIVE">INACTIVE</option>
+                </select>
+              </div>
+
               <button 
                 disabled={isSaving}
-                className="w-full py-4 mt-2 bg-[#0F172A] text-white rounded-2xl font-black uppercase tracking-widest shadow-lg hover:bg-blue-600 transition-all flex justify-center items-center gap-3 active:scale-[0.98]"
+                className="w-full py-2 mt-2 bg-[#0F172A] text-white rounded-2xl font-black uppercase tracking-widest shadow-lg hover:bg-blue-600 transition-all flex justify-center items-center gap-3 active:scale-[0.98]"
               >
-                {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                {isSaving ? <Loader2 className="animate-spin" size={15} /> : <Save size={18} />}
                 {editId ? "Update" : "Save"}
               </button>
             </div>

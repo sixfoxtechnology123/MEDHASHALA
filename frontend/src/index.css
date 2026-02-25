@@ -1,3 +1,27 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Global text style: normal readable font across the project */
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  font-weight: 400;
+}
+
+/* Tone down heavy typography utilities used in older pages */
+.font-black {
+  font-weight: 600 !important;
+}
+
+.uppercase {
+  text-transform: none !important;
+}
+
+.tracking-tighter,
+.tracking-tight,
+.tracking-normal,
+.tracking-wide,
+.tracking-wider,
+.tracking-widest {
+  letter-spacing: normal !important;
+}

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { 
   ChevronDown, ChevronRight, GraduationCap, 
-  CheckCircle2, BookOpen, LayoutGrid, ShieldCheck 
+  CheckCircle2, BookOpen, LayoutGrid, ShieldCheck, BookCopy, ClipboardList
 } from "lucide-react";
 import axios from "../api/axios";
 
@@ -13,6 +13,8 @@ const Sidebar = () => {
   // Track open states by ID so they toggle independently
   const [openExams, setOpenExams] = useState({});
   const [openCategories, setOpenCategories] = useState({});
+  const [openSyllabus, setOpenSyllabus] = useState({});
+  const [openMockTest, setOpenMockTest] = useState({});
   const [adminOpen, setAdminOpen] = useState(true);
 
   useEffect(() => {
@@ -33,10 +35,18 @@ const Sidebar = () => {
     setOpenCategories(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const toggleSyllabus = (id) => {
+    setOpenSyllabus(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const toggleMockTest = (id) => {
+    setOpenMockTest(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
   const isActive = (path) => location.pathname === path;
 
   return (
-    <div className="w-64 h-screen bg-[#0F172A] text-white flex flex-col border-r border-slate-800 shadow-2xl">
+    <div className="w-64 h-screen fixed left-0 top-0 bg-[#0F172A] text-white flex flex-col border-r border-slate-800 shadow-2xl z-40">
       <div className="p-6 border-b border-slate-800">
         <h2 className="text-xl font-black uppercase tracking-tighter text-blue-500">MEDHASHALA</h2>
       </div>
@@ -80,11 +90,99 @@ const Sidebar = () => {
                         {/* LEVEL 3: FEATURES (MOCK TEST, etc) */}
                         {openCategories[cat._id] && (
                           <div className="ml-2 mt-1 space-y-1 bg-slate-800/20 rounded-lg p-2">
-                            {cat.features.map((feat) => (
-                              <div key={feat} className="flex items-center gap-2 py-1 px-2 text-[9px] font-black text-slate-400 hover:text-blue-400 transition-colors uppercase">
-                                <CheckCircle2 size={10} className="text-emerald-500" /> {feat}
-                              </div>
-                            ))}
+                            {(cat.features || []).map((feat) => {
+                              const featureUpper = String(feat).toUpperCase();
+                              const isSyllabusFeature = featureUpper === "SYLLABUS";
+                              const isMockTestFeature = featureUpper === "MOCK TEST";
+
+                              if (!isSyllabusFeature && !isMockTestFeature) {
+                                return (
+                                  <div key={feat} className="flex items-center gap-2 py-1 px-2 text-[9px] font-black text-slate-400 hover:text-blue-400 transition-colors uppercase">
+                                    <CheckCircle2 size={10} className="text-emerald-500" /> {feat}
+                                  </div>
+                                );
+                              }
+
+                              if (isMockTestFeature) {
+                                return (
+                                  <div key={`${cat._id}-mock-test`} className="space-y-1">
+                                    <button
+                                      onClick={() => toggleMockTest(cat._id)}
+                                      className="w-full flex items-center justify-between gap-2 py-1 px-2 text-[9px] font-black text-slate-300 hover:text-blue-300 transition-colors uppercase"
+                                    >
+                                      <span className="flex items-center gap-2">
+                                        <CheckCircle2 size={10} className="text-emerald-500" />
+                                        MOCK TEST
+                                      </span>
+                                      {openMockTest[cat._id] ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+                                    </button>
+
+                                    {openMockTest[cat._id] && (
+                                      <div className="ml-3 border-l border-slate-700 pl-2 space-y-1">
+                                        {(cat.subjects || []).length > 0 ? (
+                                          cat.subjects.map((subject) => (
+                                            <Link
+                                              key={`${subject._id}-attempt`}
+                                              to={`/dashboard/mock-test-attempt/${subject._id}`}
+                                              className={`block py-1 px-2 rounded text-[10px] font-black uppercase transition-all ${
+                                                location.pathname === `/dashboard/mock-test-attempt/${subject._id}`
+                                                  ? "bg-emerald-600 text-white"
+                                                  : "text-emerald-300 hover:bg-slate-800 hover:text-white"
+                                              }`}
+                                            >
+                                              {subject.subjectName}
+                                            </Link>
+                                          ))
+                                        ) : (
+                                          <div className="py-1 px-2 text-[9px] font-black text-slate-500 uppercase">
+                                            No Subject
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              }
+
+                              return (
+                                <div key={`${cat._id}-syllabus`} className="space-y-1">
+                                  <button
+                                    onClick={() => toggleSyllabus(cat._id)}
+                                    className="w-full flex items-center justify-between gap-2 py-1 px-2 text-[9px] font-black text-slate-300 hover:text-blue-300 transition-colors uppercase"
+                                  >
+                                    <span className="flex items-center gap-2">
+                                      <CheckCircle2 size={10} className="text-emerald-500" />
+                                      SYLLABUS
+                                    </span>
+                                    {openSyllabus[cat._id] ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+                                  </button>
+
+                                  {openSyllabus[cat._id] && (
+                                    <div className="ml-3 border-l border-slate-700 pl-2 space-y-1">
+                                      {(cat.subjects || []).length > 0 ? (
+                                        cat.subjects.map((subject) => (
+                                          <Link
+                                            key={subject._id}
+                                            to={`/dashboard/syllabus-view/${subject._id}`}
+                                            className={`block py-1 px-2 rounded text-[10px] font-black uppercase transition-all ${
+                                              location.pathname === `/dashboard/syllabus-view/${subject._id}`
+                                                ? "bg-blue-600 text-white"
+                                                : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                                            }`}
+                                          >
+                                            {subject.subjectName}
+                                          </Link>
+                                        ))
+                                      ) : (
+                                        <div className="py-1 px-2 text-[9px] font-black text-slate-500 uppercase">
+                                          No Subject
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                       </div>
@@ -111,6 +209,12 @@ const Sidebar = () => {
               </Link>
               <Link to="/dashboard/category-master" className={`flex items-center gap-3 p-2.5 rounded-xl text-xs font-bold transition-all ${isActive("/dashboard/category-master") ? "bg-emerald-600 text-white shadow-lg" : "text-slate-400 hover:bg-slate-800"}`}>
                 <LayoutGrid size={16} /> Category Master
+              </Link>
+              <Link to="/dashboard/syllabus-master" className={`flex items-center gap-3 p-2.5 rounded-xl text-xs font-bold transition-all ${isActive("/dashboard/syllabus-master") ? "bg-cyan-600 text-white shadow-lg" : "text-slate-400 hover:bg-slate-800"}`}>
+                <BookCopy size={16} /> Syllabus Master
+              </Link>
+              <Link to="/dashboard/mock-test" className={`flex items-center gap-3 p-2.5 rounded-xl text-xs font-bold transition-all ${isActive("/dashboard/mock-test") ? "bg-amber-600 text-white shadow-lg" : "text-slate-400 hover:bg-slate-800"}`}>
+                <ClipboardList size={16} /> Mock Test
               </Link>
             </div>
           )}

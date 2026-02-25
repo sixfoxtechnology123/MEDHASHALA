@@ -10,6 +10,13 @@ const examSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    status: {
+      type: String,
+      enum: ["ACTIVE", "INACTIVE"],
+      default: "ACTIVE",
+      uppercase: true,
+      trim: true,
+    },
     description: {
       type: String,
     },

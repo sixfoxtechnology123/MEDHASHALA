@@ -7,6 +7,13 @@ const categorySchema = new mongoose.Schema({
 
   catName: { type: String, required: true, uppercase: true },
   features: { type: [String], default: [] },
+  status: {
+    type: String,
+    enum: ["ACTIVE", "INACTIVE"],
+    default: "ACTIVE",
+    uppercase: true,
+    trim: true,
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model("Category", categorySchema);

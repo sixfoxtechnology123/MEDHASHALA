@@ -32,6 +32,7 @@ const ExamMaster = () => {
   const [formData, setFormData] = useState({
     examCode: "",
     examName: "",
+    status: "ACTIVE",
   });
 
   // FETCH ALL
@@ -59,6 +60,7 @@ const ExamMaster = () => {
       setFormData({
         examCode: res?.data?.nextId || "",
         examName: "",
+        status: "ACTIVE",
       });
       setIsModalOpen(true);
     } catch {
@@ -72,6 +74,7 @@ const ExamMaster = () => {
     setFormData({
       examCode: item.examCode,
       examName: item.examName,
+      status: item.status || "ACTIVE",
     });
     setIsModalOpen(true);
   };
@@ -88,6 +91,7 @@ const ExamMaster = () => {
       const payload = {
         examCode: formData.examCode,
         examName: formData.examName.toUpperCase(),
+        status: (formData.status || "ACTIVE").toUpperCase(),
       };
 
       if (editId) {
@@ -100,7 +104,7 @@ const ExamMaster = () => {
       if (res.data.success || (res.status >= 200 && res.status < 300)) {
         toast.success(editId ? "RECORD UPDATED" : "RECORD SAVED");
         setIsModalOpen(false);
-        setFormData({ examCode: "", examName: "" }); // Reset form
+        setFormData({ examCode: "", examName: "", status: "ACTIVE" }); // Reset form
         fetchExams();
       }
     } catch (err) {
@@ -127,7 +131,8 @@ const ExamMaster = () => {
   const filteredData = exams.filter(
     (item) =>
       item.examName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.examCode.toLowerCase().includes(searchTerm.toLowerCase())
+      item.examCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.status || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -186,6 +191,7 @@ const ExamMaster = () => {
               <tr className="bg-[#0F172A] text-white">
                 <th className="p-2 text-[10px] font-black uppercase">ID</th>
                 <th className="p-2 text-[10px] font-black uppercase">Exam Name</th>
+                <th className="p-2 text-[10px] font-black uppercase">Status</th>
                 <th className="p-2 text-[10px] font-black uppercase text-center">
                   Manage
                 </th>
@@ -194,7 +200,7 @@ const ExamMaster = () => {
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan="3" className="p-20 text-center font-black text-slate-400 uppercase">
+                  <td colSpan="4" className="p-20 text-center font-black text-slate-400 uppercase">
                     Syncing Database...
                   </td>
                 </tr>
@@ -206,6 +212,17 @@ const ExamMaster = () => {
                     </td>
                     <td className="p-2 font-black text-slate-800 text-xs uppercase">
                       {item.examName}
+                    </td>
+                    <td className="p-2">
+                      <span
+                        className={`px-2 py-1 rounded-md text-[9px] font-black uppercase ${
+                          item.status === "INACTIVE"
+                            ? "bg-red-100 text-red-600"
+                            : "bg-emerald-100 text-emerald-700"
+                        }`}
+                      >
+                        {item.status || "ACTIVE"}
+                      </span>
                     </td>
                     <td className="p-2 flex justify-center gap-3">
                       <button
@@ -225,7 +242,7 @@ const ExamMaster = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="3" className="p-20 text-center font-black text-slate-300 uppercase text-xl">
+                  <td colSpan="4" className="p-20 text-center font-black text-slate-300 uppercase text-xl">
                     No Records Found
                   </td>
                 </tr>
@@ -258,19 +275,19 @@ const ExamMaster = () => {
 
             <div className="space-y-8">
               <div>
-                <label className="text-[11px] font-black uppercase flex items-center gap-2">
-                  <Hash size={14} /> ID Code
+                <label className="text-sm font-semibold flex items-center gap-2">
+                  ID Code
                 </label>
                 <input
                   type="text"
                   value={formData.examCode}
                   readOnly
-                  className="w-full py-2 bg-slate-50 border-b-2 font-black text-xl text-blue-600 px-4 rounded-xl"
+                  className="w-full py-2 bg-slate-50 border-b-2 font-semibold text-sm text-blue-600 px-4 rounded-xl"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-black uppercase">
+                <label className="text-sm font-semibold">
                   Exam Name
                 </label>
                 <input
@@ -284,15 +301,32 @@ const ExamMaster = () => {
                       examName: e.target.value.toUpperCase(),
                     })
                   }
-                  className="w-full py-2 border-b-2 font-black text-xl outline-none focus:border-blue-600 uppercase"
+                  className="w-full py-2 border-b-2 font-semibold text-sm outline-none focus:border-blue-600"
                 />
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold">Status</label>
+                <select
+                  value={formData.status}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      status: e.target.value,
+                    })
+                  }
+                  className="w-full py-2 border-b-2 font-semibold text-sm outline-none focus:border-blue-600 bg-white"
+                >
+                  <option value="ACTIVE">ACTIVE</option>
+                  <option value="INACTIVE">INACTIVE</option>
+                </select>
               </div>
 
               <button
                 disabled={isSaving}
-                className="w-full py-3 bg-[#0F172A] hover:bg-blue-600 text-white font-black rounded-2xl shadow-xl flex items-center justify-center gap-3"
+                className="w-full py-2 bg-[#0F172A] hover:bg-blue-600 text-white font-black rounded-2xl shadow-xl flex items-center justify-center gap-3"
               >
-                {isSaving ? <Loader2 className="animate-spin" /> : <Save size={20} />}
+                {isSaving ? <Loader2 className="animate-spin" /> : <Save size={15} />}
                 {editId ? "UPDATE RECORD" : "SAVE RECORD"}
               </button>
             </div>

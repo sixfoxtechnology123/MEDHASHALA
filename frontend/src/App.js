@@ -7,6 +7,10 @@ import Dashboard from "./pages/Dashboard";
 import CategoryMaster from "./pages/CategoryMaster";
 import ExamMaster from "./pages/ExamMaster";
 import ExamView from "./pages/ExamView";
+import SyllabusMaster from "./pages/SyllabusMaster";
+import SyllabusView from "./pages/SyllabusView";
+import MockTest from "./pages/MockTest";
+import MockTestAttempt from "./pages/MockTestAttempt";
 import ProtectedRoute from "./routes/ProtectedRoute";
 
 function App() {
@@ -66,6 +70,12 @@ function App() {
 
           {/* Exam View */}
           <Route path="exam-view" element={<ExamView />} />
+
+          {/* Syllabus Master */}
+          <Route path="syllabus-master" element={<SyllabusMaster />} />
+          <Route path="syllabus-view/:syllabusId" element={<SyllabusView />} />
+          <Route path="mock-test" element={<MockTest />} />
+          <Route path="mock-test-attempt/:subjectId" element={<MockTestAttempt />} />
 
         </Route>
       </Routes>

@@ -4,11 +4,12 @@ import Sidebar from "../component/Sidebar";
 
 const Dashboard = () => {
   return (
-    <div style={{ display: "flex" }}>
+    <div style={{ display: "flex", minHeight: "100vh", background: "#f1f5f9" }}>
       <Sidebar />
 
       <div style={{
         flex: 1,
+        marginLeft: "256px",
         padding: "20px",
         background: "#f1f5f9",
         minHeight: "100vh"
