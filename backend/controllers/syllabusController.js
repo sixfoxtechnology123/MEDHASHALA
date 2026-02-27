@@ -3,6 +3,7 @@ const Syllabus = require("../models/Syllabus");
 const Exam = require("../models/Exam");
 const Category = require("../models/Category");
 const MockTest = require("../models/MockTest");
+const QuestionBank = require("../models/QuestionBank");
 
 const generateNextSyllabusId = async () => {
   const lastSyllabus = await Syllabus.findOne().sort({ syllabusId: -1 });
@@ -146,6 +147,7 @@ exports.deleteSyllabus = async (req, res) => {
   try {
     await Syllabus.findByIdAndDelete(req.params.id);
     await MockTest.deleteMany({ subjectId: req.params.id });
+    await QuestionBank.deleteMany({ subjectId: req.params.id });
     res.json({ success: true, message: "DELETED" });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

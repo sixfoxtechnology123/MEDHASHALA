@@ -25,3 +25,87 @@ body {
 .tracking-widest {
   letter-spacing: normal !important;
 }
+
+.medha-stage {
+  background: linear-gradient(145deg, #f8fbff 0%, #eef6ff 52%, #ffffff 100%);
+  border: 1px solid #dbeafe;
+}
+
+.medha-glow {
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  border-radius: 9999px;
+  filter: blur(40px);
+  opacity: 0.28;
+  pointer-events: none;
+}
+
+.medha-glow-one {
+  background: #06b6d4;
+  top: -80px;
+  right: -50px;
+}
+
+.medha-glow-two {
+  background: #6366f1;
+  bottom: -120px;
+  left: -80px;
+}
+
+.medha-stat-card {
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+  transform: translateY(0);
+  transition: transform 220ms ease, box-shadow 220ms ease;
+}
+
+.medha-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 26px rgba(15, 23, 42, 0.12);
+}
+
+.medha-hero-card {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #dbeafe;
+  border-radius: 24px;
+  padding: 16px;
+  box-shadow: 0 16px 40px rgba(2, 132, 199, 0.15);
+  transform: perspective(1000px) rotateY(-6deg) rotateX(4deg);
+  transition: transform 240ms ease;
+}
+
+.medha-hero-card:hover {
+  transform: perspective(1000px) rotateY(-2deg) rotateX(1deg);
+}
+
+.medha-fade-in-up {
+  animation: medhaFadeInUp 0.7s ease forwards;
+}
+
+.medha-float-in {
+  animation: medhaFloatIn 1.4s ease-in-out infinite;
+}
+
+@keyframes medhaFadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes medhaFloatIn {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+  100% { transform: translateY(0); }
+}

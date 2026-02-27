@@ -25,7 +25,7 @@ const QuestionMaster = () => {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-4">Question Master</h2>
+      <h2 className="text-2xl font-bold mb-4">Question</h2>
 
       <div className="bg-white p-6 rounded shadow space-y-3">
         <div>

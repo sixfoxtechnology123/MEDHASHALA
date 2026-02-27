@@ -144,7 +144,7 @@ const CategoryMaster = () => {
         <Layers size={14} />
       </div>
       <h1 className="text-lg font-black text-slate-900 uppercase tracking-tighter">
-        Category Master
+        Category 
       </h1>
     </div>
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { 
   ChevronDown, ChevronRight, GraduationCap, 
-  CheckCircle2, BookOpen, LayoutGrid, ShieldCheck, BookCopy, ClipboardList
+  CheckCircle2, BookOpen, LayoutGrid, ShieldCheck, BookCopy, ClipboardList, CircleHelp, Home
 } from "lucide-react";
 import axios from "../api/axios";
 
@@ -52,6 +52,9 @@ const Sidebar = () => {
       </div>
 
       <div className="flex-1 p-4 overflow-y-auto space-y-6 custom-scrollbar">
+          <Link to="/dashboard" className={`flex items-center gap-3 p-2.5 rounded-xl text-xs font-bold transition-all ${isActive("/dashboard") ? "bg-violet-600 text-white shadow-lg" : "text-slate-400 hover:bg-slate-800"}`}>
+                <Home size={16} /> Dashboard
+              </Link>
         {/* --- DYNAMIC EXAMS LIST --- */}
         <div>
           <h3 className="px-2 mb-3 text-[10px] font-black uppercase tracking-widest text-slate-500">Exams List</h3>
@@ -119,13 +122,13 @@ const Sidebar = () => {
 
                                     {openMockTest[cat._id] && (
                                       <div className="ml-3 border-l border-slate-700 pl-2 space-y-1">
-                                        {(cat.subjects || []).length > 0 ? (
-                                          cat.subjects.map((subject) => (
+                                        {(cat.mockTestSubjects || []).length > 0 ? (
+                                          cat.mockTestSubjects.map((subject) => (
                                             <Link
-                                              key={`${subject._id}-attempt`}
-                                              to={`/dashboard/mock-test-attempt/${subject._id}`}
+                                              key={`${subject.syllabusId || subject._id}-attempt`}
+                                              to={`/dashboard/mock-test-attempt/${subject.syllabusId || subject._id}`}
                                               className={`block py-1 px-2 rounded text-[10px] font-black uppercase transition-all ${
-                                                location.pathname === `/dashboard/mock-test-attempt/${subject._id}`
+                                                location.pathname === `/dashboard/mock-test-attempt/${subject.syllabusId || subject._id}`
                                                   ? "bg-emerald-600 text-white"
                                                   : "text-emerald-300 hover:bg-slate-800 hover:text-white"
                                               }`}
@@ -204,17 +207,21 @@ const Sidebar = () => {
           </button>
           {adminOpen && (
             <div className="mt-2 space-y-1">
+            
               <Link to="/dashboard/exam-master" className={`flex items-center gap-3 p-2.5 rounded-xl text-xs font-bold transition-all ${isActive("/dashboard/exam-master") ? "bg-blue-600 text-white shadow-lg" : "text-slate-400 hover:bg-slate-800"}`}>
-                <BookOpen size={16} /> Exam Master
+                <BookOpen size={16} /> Exam 
               </Link>
               <Link to="/dashboard/category-master" className={`flex items-center gap-3 p-2.5 rounded-xl text-xs font-bold transition-all ${isActive("/dashboard/category-master") ? "bg-emerald-600 text-white shadow-lg" : "text-slate-400 hover:bg-slate-800"}`}>
-                <LayoutGrid size={16} /> Category Master
+                <LayoutGrid size={16} /> Category
               </Link>
               <Link to="/dashboard/syllabus-master" className={`flex items-center gap-3 p-2.5 rounded-xl text-xs font-bold transition-all ${isActive("/dashboard/syllabus-master") ? "bg-cyan-600 text-white shadow-lg" : "text-slate-400 hover:bg-slate-800"}`}>
-                <BookCopy size={16} /> Syllabus Master
+                <BookCopy size={16} /> Syllabus 
+              </Link>
+              <Link to="/dashboard/question-bank" className={`flex items-center gap-3 p-2.5 rounded-xl text-xs font-bold transition-all ${isActive("/dashboard/question-bank") ? "bg-fuchsia-600 text-white shadow-lg" : "text-slate-400 hover:bg-slate-800"}`}>
+                <CircleHelp size={16} /> Question Bank
               </Link>
               <Link to="/dashboard/mock-test" className={`flex items-center gap-3 p-2.5 rounded-xl text-xs font-bold transition-all ${isActive("/dashboard/mock-test") ? "bg-amber-600 text-white shadow-lg" : "text-slate-400 hover:bg-slate-800"}`}>
-                <ClipboardList size={16} /> Mock Test
+                <ClipboardList size={16} /> Mock Test Question Set
               </Link>
             </div>
           )}

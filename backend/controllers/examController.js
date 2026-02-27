@@ -2,6 +2,7 @@ const Exam = require("../models/Exam");
 const Category = require("../models/Category");
 const Syllabus = require("../models/Syllabus");
 const MockTest = require("../models/MockTest");
+const QuestionBank = require("../models/QuestionBank");
 
 /**
  * HELPER: Generate Next ID (Non-reusable)
@@ -95,6 +96,7 @@ exports.deleteExam = async (req, res) => {
     await Category.deleteMany({ examName: exam.examName });
     await Syllabus.deleteMany({ examCode: exam.examCode });
     await MockTest.deleteMany({ examCode: exam.examCode });
+    await QuestionBank.deleteMany({ examCode: exam.examCode });
 
     // 3. Delete the Exam itself
     await Exam.findByIdAndDelete(req.params.id);

@@ -9,6 +9,7 @@ const examRoutes = require("./routes/examRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
 const syllabusRoutes = require("./routes/syllabusRoutes");
 const mockTestRoutes = require("./routes/mockTestRoutes");
+const questionBankRoutes = require("./routes/questionBankRoutes");
 const sidebarRoutes = require("./routes/sidebarRoutes");
 const app = express();
 
@@ -24,6 +25,7 @@ app.use("/api/exams", examRoutes);
 // This line is already correct for axios.get("/master/category/...")
 app.use("/api/master/category", categoryRoutes);
 app.use("/api/master/syllabus", syllabusRoutes);
+app.use("/api/master/question-bank", questionBankRoutes);
 app.use("/api/master/mock-test", mockTestRoutes);
 
 

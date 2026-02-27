@@ -258,7 +258,7 @@ const SyllabusMaster = () => {
               <BookCopy size={14} />
             </div>
             <h1 className="text-lg font-black text-slate-900 uppercase tracking-tighter">
-              Syllabus Master
+              Syllabus
             </h1>
           </div>
 

@@ -2,6 +2,7 @@ const Category = require("../models/Category");
 const Exam = require("../models/Exam");
 const Syllabus = require("../models/Syllabus");
 const MockTest = require("../models/MockTest");
+const QuestionBank = require("../models/QuestionBank");
 const mongoose = require("mongoose");
 
 const generateNextCategoryId = async () => {
@@ -92,6 +93,10 @@ exports.deleteCategory = async (req, res) => {
         catId: deleted.catId,
       });
       await MockTest.deleteMany({
+        examCode: deleted.examCode,
+        categoryCode: deleted.catId,
+      });
+      await QuestionBank.deleteMany({
         examCode: deleted.examCode,
         categoryCode: deleted.catId,
       });

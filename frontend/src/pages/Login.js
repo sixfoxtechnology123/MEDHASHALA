@@ -16,7 +16,11 @@ const Login = () => {
     try {
       const { data } = await API.post("/auth/login", form);
       login(data);
-      navigate("/dashboard");
+      if (String(data?.user?.role || "").toLowerCase() === "admin") {
+        navigate("/dashboard");
+      } else {
+        navigate("/student");
+      }
     } catch (err) {
       if (axios.isAxiosError(err)) {
         setError(err.response?.data?.message || "Login failed");

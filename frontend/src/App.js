@@ -4,6 +4,7 @@ import { Toaster } from "react-hot-toast";   // ✅ Added
 
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import DashboardHome from "./pages/DashboardHome";
 import CategoryMaster from "./pages/CategoryMaster";
 import ExamMaster from "./pages/ExamMaster";
 import ExamView from "./pages/ExamView";
@@ -11,6 +12,8 @@ import SyllabusMaster from "./pages/SyllabusMaster";
 import SyllabusView from "./pages/SyllabusView";
 import MockTest from "./pages/MockTest";
 import MockTestAttempt from "./pages/MockTestAttempt";
+import QuestionBank from "./pages/QuestionBank";
+import StudentDashboard from "./pages/StudentDashboard";
 import ProtectedRoute from "./routes/ProtectedRoute";
 
 function App() {
@@ -60,7 +63,7 @@ function App() {
         >
 
           {/* Default Dashboard Page */}
-          <Route index element={<h2>Welcome Admin</h2>} />
+          <Route index element={<DashboardHome />} />
 
           {/* Category */}
           <Route path="category-master" element={<CategoryMaster />} />
@@ -74,10 +77,20 @@ function App() {
           {/* Syllabus Master */}
           <Route path="syllabus-master" element={<SyllabusMaster />} />
           <Route path="syllabus-view/:syllabusId" element={<SyllabusView />} />
+          <Route path="question-bank" element={<QuestionBank />} />
           <Route path="mock-test" element={<MockTest />} />
           <Route path="mock-test-attempt/:subjectId" element={<MockTestAttempt />} />
 
         </Route>
+
+        <Route
+          path="/student"
+          element={
+            <ProtectedRoute>
+              <StudentDashboard />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </Router>
   );

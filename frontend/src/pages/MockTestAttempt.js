@@ -13,6 +13,7 @@ const MockTestAttempt = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [elapsedSec, setElapsedSec] = useState(0);
+  const [activeSet, setActiveSet] = useState(null);
 
   useEffect(() => {
     const loadQuestions = async () => {
@@ -20,10 +21,16 @@ const MockTestAttempt = () => {
       setError("");
       try {
         const res = await axios.get(
-          `/master/mock-test/all?subjectId=${encodeURIComponent(subjectId)}&onlyActive=true`
+          `/master/mock-test/attempt-questions?subjectId=${encodeURIComponent(subjectId)}`
         );
         const rows = Array.isArray(res.data?.data) ? res.data.data : [];
         setQuestions(rows);
+        setActiveSet(res.data?.set || null);
+        setAnswers({});
+        setSavedMap({});
+        setMarkedMap({});
+        setCurrentIndex(0);
+        setSubmitted(false);
         setElapsedSec(0);
       } catch (err) {
         setError(err?.response?.data?.message || "FAILED TO LOAD QUESTIONS");
@@ -116,7 +123,9 @@ const MockTestAttempt = () => {
 
   if (loading) return <div className="p-6 text-sm font-semibold text-slate-500">Loading mock test...</div>;
   if (error) return <div className="p-6 text-sm font-semibold text-red-600">{error}</div>;
-  if (!questions.length) return <div className="p-6 text-sm font-semibold text-slate-500">No active questions for this subject.</div>;
+  if (!questions.length) {
+    return <div className="p-6 text-sm font-semibold text-slate-500">No selected question set for this subject. Ask admin to select one set.</div>;
+  }
 
   return (
     <div className="max-w-7xl mx-auto p-2">
@@ -124,7 +133,7 @@ const MockTestAttempt = () => {
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Mock Test Attempt</h1>
           <p className="text-sm font-semibold text-slate-500 mt-1">
-            Subject: {questions[0]?.subjectName || "-"} | Total: {questions.length}
+            Subject: {questions[0]?.subjectName || "-"} | Set: {activeSet?.questionSetId || "-"} | Total: {questions.length}
           </p>
         </div>
         <div className="text-right">
@@ -239,6 +248,19 @@ const MockTestAttempt = () => {
             <p className="text-sm font-semibold text-emerald-700 mt-1">
               Total Time Taken: {formatTime(elapsedSec)}
             </p>
+            <button
+              onClick={() => {
+                setSubmitted(false);
+                setAnswers({});
+                setSavedMap({});
+                setMarkedMap({});
+                setCurrentIndex(0);
+                setElapsedSec(0);
+              }}
+              className="mt-3 px-4 py-2 rounded-lg bg-emerald-700 text-white text-sm font-semibold hover:bg-emerald-800"
+            >
+              Reattempt
+            </button>
           </div>
 
           <div className="space-y-3">

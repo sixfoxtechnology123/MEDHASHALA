@@ -145,7 +145,7 @@ const ExamMaster = () => {
               <BookOpen size={14} />
             </div>
             <h1 className="text-lg font-black text-slate-900 uppercase tracking-tighter">
-              Exam Master
+              Exam
             </h1>
           </div>
 

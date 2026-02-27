@@ -25,7 +25,7 @@ exports.login = async (req, res) => {
       JWT_SECRET,
       { expiresIn: "1d" }
     );
-
+ 
     return res.status(200).json({
       token,
       user: {

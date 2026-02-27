@@ -1,400 +1,400 @@
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  CheckSquare,
-  Edit,
-  Loader2,
-  Plus,
-  RefreshCw,
-  Save,
-  Search,
-  Square,
-  Trash2,
-  X,
-} from "lucide-react";
-import { useSearchParams } from "react-router-dom";
+import { Edit, Eye, Loader2, Plus, RefreshCw, Save, Trash2, X } from "lucide-react";
 import toast from "react-hot-toast";
 import axios from "../api/axios";
 
-const emptyQuestion = {
-  questionId: "",
-  questionText: "",
-  optionA: "",
-  optionB: "",
-  optionC: "",
-  optionD: "",
-  correctOption: "A",
-  explanationText: "",
-  difficultyLevel: "moderate",
-  languageCode: "en",
-  isActive: true,
+const toastErrorOnce = (msg) => toast.error(msg, { id: "one-error" });
+const toastOkOnce = (msg) => toast.success(msg, { id: "one-success" });
+
+const nextBankId = (currentId) => {
+  const n = parseInt(String(currentId || "").replace("QSBANK", ""), 10);
+  return `QSBANK${(Number.isNaN(n) ? 0 : n) + 1}`;
 };
 
-const nextQsSetId = (currentId) => {
-  const n = parseInt(String(currentId || "").replace("QS-SET", ""), 10);
-  return `QS-SET${(Number.isNaN(n) ? 0 : n) + 1}`;
+const QuestionInlineForm = ({ exams, categories, subjects, onSaved }) => {
+  const [saving, setSaving] = useState(false);
+  const [baseForm, setBaseForm] = useState({ examMasterId: "", examCategoryId: "", subjectId: "" });
+  const [questionForm, setQuestionForm] = useState({
+    questionBankId: "",
+    marks: 1,
+    negativeMarks: 0,
+    questionText: "",
+    optionA: "",
+    optionB: "",
+    optionC: "",
+    optionD: "",
+    correctOption: "A",
+    explanationText: "",
+    status: "ACTIVE",
+  });
+  const [drafts, setDrafts] = useState([]);
+
+  const filteredCategories = useMemo(() => {
+    if (!baseForm.examMasterId) return [];
+    return categories.filter((cat) => String(cat.examCode || "").toUpperCase() === String(baseForm.examMasterId || "").toUpperCase());
+  }, [categories, baseForm.examMasterId]);
+
+  const filteredSubjects = useMemo(() => {
+    if (!baseForm.examMasterId || !baseForm.examCategoryId) return [];
+    return subjects.filter(
+      (s) =>
+        String(s.examCode || "").toUpperCase() === String(baseForm.examMasterId || "").toUpperCase() &&
+        String(s.catId || "").toUpperCase() === String(baseForm.examCategoryId || "").toUpperCase()
+    );
+  }, [subjects, baseForm.examMasterId, baseForm.examCategoryId]);
+
+  const loadId = async () => {
+    try {
+      const res = await axios.get("/master/question-bank/next-id");
+      setQuestionForm((prev) => ({ ...prev, questionBankId: res.data?.nextId || "QSBANK1" }));
+    } catch {
+      setQuestionForm((prev) => ({ ...prev, questionBankId: "QSBANK1" }));
+    }
+  };
+
+  useEffect(() => { loadId(); }, []);
+
+  const addDraft = () => {
+    if (!baseForm.examMasterId || !baseForm.examCategoryId || !baseForm.subjectId) return toastErrorOnce("SELECT EXAM, CATEGORY, SUBJECT");
+    if (!questionForm.questionText || !questionForm.optionA || !questionForm.optionB || !questionForm.optionC || !questionForm.optionD) {
+      return toastErrorOnce("FILL QUESTION AND OPTIONS");
+    }
+    setDrafts((prev) => [...prev, { ...questionForm }]);
+    setQuestionForm((prev) => ({
+      ...prev,
+      questionBankId: nextBankId(prev.questionBankId),
+      questionText: "",
+      optionA: "",
+      optionB: "",
+      optionC: "",
+      optionD: "",
+      correctOption: "A",
+      explanationText: "",
+    }));
+  };
+
+  const submitAll = async () => {
+    if (saving) return;
+    if (!drafts.length) return toastErrorOnce("ADD AT LEAST ONE DRAFT");
+    setSaving(true);
+    try {
+      for (const q of drafts) {
+        await axios.post("/master/question-bank/upsert", { ...baseForm, ...q });
+      }
+      toastOkOnce("DRAFT QUESTIONS SAVED");
+      setDrafts([]);
+      await loadId();
+      if (onSaved) onSaved(baseForm.subjectId);
+    } catch (err) {
+      toastErrorOnce(err?.response?.data?.message || "FAILED");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-gradient-to-br from-cyan-50 via-white to-blue-50 p-4 shadow-sm space-y-3">
+      <p className="text-sm font-semibold text-slate-800">Instant Add Multiple Questions</p>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+        <select value={baseForm.examMasterId} onChange={(e) => setBaseForm((p) => ({ ...p, examMasterId: e.target.value, examCategoryId: "", subjectId: "" }))} className="p-2 border border-slate-200 rounded-lg text-sm font-normal">
+          <option value="">Exam</option>{exams.map((ex) => <option key={ex.examCode} value={ex.examCode}>{ex.examName}</option>)}
+        </select>
+        <select value={baseForm.examCategoryId} onChange={(e) => setBaseForm((p) => ({ ...p, examCategoryId: e.target.value, subjectId: "" }))} className="p-2 border border-slate-200 rounded-lg text-sm font-normal">
+          <option value="">Category</option>{filteredCategories.map((cat) => <option key={cat.catId} value={cat.catId}>{cat.catName}</option>)}
+        </select>
+        <select value={baseForm.subjectId} onChange={(e) => setBaseForm((p) => ({ ...p, subjectId: e.target.value }))} className="p-2 border border-slate-200 rounded-lg text-sm font-normal">
+          <option value="">Subject</option>{filteredSubjects.map((sub) => <option key={sub.syllabusId} value={sub.syllabusId}>{sub.subjectName}</option>)}
+        </select>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+        <div className="p-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-blue-700">{questionForm.questionBankId || "QSBANK..."}</div>
+        <input type="number" min="0" step="0.5" value={questionForm.marks} onChange={(e) => setQuestionForm((p) => ({ ...p, marks: Number(e.target.value) }))} placeholder="Marks" className="p-2 border border-slate-200 rounded-lg text-sm font-normal" />
+        <input type="number" min="0" step="0.25" value={questionForm.negativeMarks} onChange={(e) => setQuestionForm((p) => ({ ...p, negativeMarks: Number(e.target.value) }))} placeholder="Negative Marks" className="p-2 border border-slate-200 rounded-lg text-sm font-normal" />
+      </div>
+      <textarea value={questionForm.questionText} onChange={(e) => setQuestionForm((p) => ({ ...p, questionText: e.target.value }))} placeholder="Question" className="w-full p-2 border border-slate-200 rounded-lg text-sm font-normal" />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+        <input value={questionForm.optionA} onChange={(e) => setQuestionForm((p) => ({ ...p, optionA: e.target.value }))} placeholder="Option A" className="p-2 border border-slate-200 rounded-lg text-sm font-normal" />
+        <input value={questionForm.optionB} onChange={(e) => setQuestionForm((p) => ({ ...p, optionB: e.target.value }))} placeholder="Option B" className="p-2 border border-slate-200 rounded-lg text-sm font-normal" />
+        <input value={questionForm.optionC} onChange={(e) => setQuestionForm((p) => ({ ...p, optionC: e.target.value }))} placeholder="Option C" className="p-2 border border-slate-200 rounded-lg text-sm font-normal" />
+        <input value={questionForm.optionD} onChange={(e) => setQuestionForm((p) => ({ ...p, optionD: e.target.value }))} placeholder="Option D" className="p-2 border border-slate-200 rounded-lg text-sm font-normal" />
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+        <select value={questionForm.correctOption} onChange={(e) => setQuestionForm((p) => ({ ...p, correctOption: e.target.value }))} className="p-2 border border-slate-200 rounded-lg text-sm font-normal"><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select>
+        <select value={questionForm.status} onChange={(e) => setQuestionForm((p) => ({ ...p, status: e.target.value }))} className="p-2 border border-slate-200 rounded-lg text-sm font-normal"><option value="ACTIVE">ACTIVE</option><option value="INACTIVE">INACTIVE</option></select>
+      </div>
+      <textarea value={questionForm.explanationText} onChange={(e) => setQuestionForm((p) => ({ ...p, explanationText: e.target.value }))} placeholder="Explanation" className="w-full p-2 border border-slate-200 rounded-lg text-sm font-normal" />
+      <div className="flex gap-2">
+        <button type="button" onClick={addDraft} className="px-4 py-2 text-xs rounded-lg bg-blue-600 text-white">Add Draft</button>
+        <button type="button" disabled={saving} onClick={submitAll} className="px-4 py-2 text-xs rounded-lg bg-slate-900 text-white">{saving ? "Saving..." : "Final Submit"}</button>
+      </div>
+      <div className="space-y-1">
+        {drafts.map((d, i) => (
+          <div key={`${d.questionBankId}-${i}`} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-2">
+            <p className="text-xs font-normal">{d.questionBankId} - {d.questionText}</p>
+            <button type="button" onClick={() => setDrafts((prev) => prev.filter((_, idx) => idx !== i))} className="text-red-500 text-xs">Remove</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 };
 
 const MockTest = () => {
-  const [searchParams] = useSearchParams();
-  const querySubjectId = searchParams.get("subjectId") || "";
-
   const [exams, setExams] = useState([]);
   const [categories, setCategories] = useState([]);
   const [subjects, setSubjects] = useState([]);
-  const [rows, setRows] = useState([]);
+  const [sets, setSets] = useState([]);
+  const [questionBankRows, setQuestionBankRows] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [filters, setFilters] = useState({ examMasterId: "", examCategoryId: "", subjectId: "" });
+  const [pagination, setPagination] = useState({ page: 1, limit: 10, totalPages: 1 });
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editId, setEditId] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
-
-  const [baseForm, setBaseForm] = useState({
+  const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false);
+  const [editId, setEditId] = useState("");
+  const [isViewOnly, setIsViewOnly] = useState(false);
+  const [form, setForm] = useState({
+    questionSetId: "",
     examMasterId: "",
     examCategoryId: "",
     subjectId: "",
-    questionMarks: Number(localStorage.getItem("mocktest_question_marks") || 1),
-    negativeMark: Number(localStorage.getItem("mocktest_negative_marks") || 0),
+    testDate: new Date().toISOString().slice(0, 10),
+    status: "ACTIVE",
+    selectionType: "AUTO",
+    questionCount: 10,
+    questionIds: [],
   });
-  const [questionForm, setQuestionForm] = useState({ ...emptyQuestion });
-  const [draftQuestions, setDraftQuestions] = useState([]);
+  const [showOnlySetQuestions, setShowOnlySetQuestions] = useState(true);
 
-  const fetchData = async () => {
+  const filteredCategories = useMemo(() => {
+    if (!filters.examMasterId) return [];
+    return categories.filter((cat) => String(cat.examCode || "").toUpperCase() === String(filters.examMasterId || "").toUpperCase());
+  }, [categories, filters.examMasterId]);
+
+  const filteredSubjects = useMemo(() => {
+    if (!filters.examMasterId || !filters.examCategoryId) return [];
+    return subjects.filter(
+      (s) =>
+        String(s.examCode || "").toUpperCase() === String(filters.examMasterId || "").toUpperCase() &&
+        String(s.catId || "").toUpperCase() === String(filters.examCategoryId || "").toUpperCase()
+    );
+  }, [subjects, filters.examMasterId, filters.examCategoryId]);
+
+  const modalFilteredCategories = useMemo(() => {
+    if (!form.examMasterId) return [];
+    return categories.filter((cat) => String(cat.examCode || "").toUpperCase() === String(form.examMasterId || "").toUpperCase());
+  }, [categories, form.examMasterId]);
+
+  const modalFilteredSubjects = useMemo(() => {
+    if (!form.examMasterId || !form.examCategoryId) return [];
+    return subjects.filter(
+      (s) =>
+        String(s.examCode || "").toUpperCase() === String(form.examMasterId || "").toUpperCase() &&
+        String(s.catId || "").toUpperCase() === String(form.examCategoryId || "").toUpperCase()
+    );
+  }, [subjects, form.examMasterId, form.examCategoryId]);
+
+  const fetchMasters = async () => {
+    const [examRes, catRes, subRes] = await Promise.allSettled([axios.get("/master/exam"), axios.get("/master/category/all"), axios.get("/master/syllabus/all")]);
+    setExams(examRes.status === "fulfilled" ? (Array.isArray(examRes.value.data) ? examRes.value.data : examRes.value.data?.data || []) : []);
+    setCategories(catRes.status === "fulfilled" ? (Array.isArray(catRes.value.data) ? catRes.value.data : catRes.value.data?.data || []) : []);
+    setSubjects(subRes.status === "fulfilled" ? (Array.isArray(subRes.value.data) ? subRes.value.data : subRes.value.data?.data || []) : []);
+  };
+
+  const fetchSets = async () => {
     setLoading(true);
     try {
-      const [examRes, catRes, subRes, rowRes] = await Promise.allSettled([
-        axios.get("/master/exam"),
-        axios.get("/master/category/all"),
-        axios.get("/master/syllabus/all"),
-        axios.get(
-          querySubjectId
-            ? `/master/mock-test/all?subjectId=${encodeURIComponent(querySubjectId)}`
-            : "/master/mock-test/all"
-        ),
-      ]);
-
-      const examList =
-        examRes.status === "fulfilled"
-          ? Array.isArray(examRes.value.data)
-            ? examRes.value.data
-            : examRes.value.data?.data || []
-          : [];
-      const catList =
-        catRes.status === "fulfilled"
-          ? Array.isArray(catRes.value.data)
-            ? catRes.value.data
-            : catRes.value.data?.data || []
-          : [];
-      const subList =
-        subRes.status === "fulfilled"
-          ? Array.isArray(subRes.value.data)
-            ? subRes.value.data
-            : subRes.value.data?.data || []
-          : [];
-      const mockList =
-        rowRes.status === "fulfilled"
-          ? Array.isArray(rowRes.value.data)
-            ? rowRes.value.data
-            : rowRes.value.data?.data || []
-          : [];
-
-      setExams(examList);
-      setCategories(catList);
-      setSubjects(subList);
-      setRows(mockList);
+      const params = new URLSearchParams();
+      if (filters.examMasterId) params.set("examMasterId", filters.examMasterId);
+      if (filters.examCategoryId) params.set("examCategoryId", filters.examCategoryId);
+      if (filters.subjectId) params.set("subjectId", filters.subjectId);
+      params.set("page", String(pagination.page));
+      params.set("limit", String(pagination.limit));
+      const res = await axios.get(`/master/mock-test/all?${params.toString()}`);
+      setSets(Array.isArray(res.data?.data) ? res.data.data : []);
+      setPagination((prev) => ({ ...prev, page: res.data?.pagination?.page || prev.page, totalPages: res.data?.pagination?.totalPages || 1 }));
     } catch {
-      toast.error("DATABASE SYNC FAILED");
+      toastErrorOnce("FAILED TO LOAD QUESTION SETS");
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => { fetchMasters(); }, []);
   useEffect(() => {
-    fetchData();
-  }, [querySubjectId]);
+    fetchSets();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.examMasterId, filters.examCategoryId, filters.subjectId, pagination.page]);
 
-  useEffect(() => {
-    localStorage.setItem("mocktest_question_marks", String(baseForm.questionMarks ?? 1));
-  }, [baseForm.questionMarks]);
-
-  useEffect(() => {
-    localStorage.setItem("mocktest_negative_marks", String(baseForm.negativeMark ?? 0));
-  }, [baseForm.negativeMark]);
-
-  const filteredCategories = useMemo(() => {
-    const selectedExam = exams.find((ex) => String(ex._id) === String(baseForm.examMasterId));
-    if (!selectedExam) return [];
-    return categories.filter(
-      (cat) =>
-        String(cat.examCode || "").toUpperCase() === String(selectedExam.examCode || "").toUpperCase()
-    );
-  }, [categories, exams, baseForm.examMasterId]);
-
-  const filteredSubjects = useMemo(() => {
-    const selectedExam = exams.find((ex) => String(ex._id) === String(baseForm.examMasterId));
-    const selectedCategory = categories.find((cat) => String(cat._id) === String(baseForm.examCategoryId));
-    if (!selectedExam || !selectedCategory) return [];
-    return subjects.filter(
-      (s) =>
-        String(s.examCode || "").toUpperCase() === String(selectedExam.examCode || "").toUpperCase() &&
-        String(s.catId || "").toUpperCase() === String(selectedCategory.catId || "").toUpperCase()
-    );
-  }, [subjects, exams, categories, baseForm.examMasterId, baseForm.examCategoryId]);
-
-  const filteredRows = useMemo(() => {
-    const q = searchTerm.toLowerCase();
-    return rows.filter(
-      (r) =>
-        (r.questionId || "").toLowerCase().includes(q) ||
-        (r.examName || "").toLowerCase().includes(q) ||
-        (r.categoryName || "").toLowerCase().includes(q) ||
-        (r.subjectName || "").toLowerCase().includes(q) ||
-        (r.questionText || "").toLowerCase().includes(q)
-    );
-  }, [rows, searchTerm]);
+  const fetchQuestionBankRows = async (subjectId) => {
+    if (!subjectId) return setQuestionBankRows([]);
+    try {
+      const res = await axios.get(`/master/question-bank/all?subjectId=${encodeURIComponent(subjectId)}&status=ACTIVE&page=1&limit=1000`);
+      setQuestionBankRows(Array.isArray(res.data?.data) ? res.data.data : []);
+    } catch {
+      setQuestionBankRows([]);
+    }
+  };
 
   const openAddModal = async () => {
-    setEditId(null);
-    setDraftQuestions([]);
     try {
       const idRes = await axios.get("/master/mock-test/next-id");
-      const initialId = idRes.data?.nextId || "QS-SET1";
-      const nextBase = {
-        examMasterId: "",
-        examCategoryId: "",
-        subjectId: querySubjectId || "",
-        questionMarks: Number(localStorage.getItem("mocktest_question_marks") || 1),
-        negativeMark: Number(localStorage.getItem("mocktest_negative_marks") || 0),
-      };
-
-      if (querySubjectId) {
-        const selectedSubject = subjects.find((s) => String(s._id) === String(querySubjectId));
-        if (selectedSubject) {
-          const matchedExam = exams.find(
-            (e) =>
-              String(e.examCode || "").toUpperCase() === String(selectedSubject.examCode || "").toUpperCase()
-          );
-          const matchedCategory = categories.find(
-            (c) =>
-              String(c.catId || "").toUpperCase() === String(selectedSubject.catId || "").toUpperCase() &&
-              String(c.examCode || "").toUpperCase() === String(selectedSubject.examCode || "").toUpperCase()
-          );
-          nextBase.examMasterId = matchedExam?._id || "";
-          nextBase.examCategoryId = matchedCategory?._id || "";
-        }
-      }
-
-      setBaseForm(nextBase);
-      setQuestionForm({ ...emptyQuestion, questionId: initialId });
+      setEditId("");
+      setIsViewOnly(false);
+      setForm({ questionSetId: idRes.data?.nextId || "QSET1", examMasterId: "", examCategoryId: "", subjectId: "", testDate: new Date().toISOString().slice(0, 10), status: "ACTIVE", selectionType: "AUTO", questionCount: 10, questionIds: [] });
+      setQuestionBankRows([]);
       setIsModalOpen(true);
     } catch {
-      toast.error("ID GENERATION FAILED");
+      toastErrorOnce("FAILED TO GENERATE SET ID");
     }
   };
 
-  const handleEdit = (row) => {
-    setEditId(row._id);
-    setDraftQuestions([]);
-    setBaseForm({
-      examMasterId: row.examMasterId || "",
-      examCategoryId: row.examCategoryId || "",
-      subjectId: row.subjectId || "",
-      questionMarks: Number(row.marks ?? 1),
-      negativeMark: Number(row.negativeMarks ?? 0),
-    });
-    setQuestionForm({
-      questionId: row.questionId || "",
-      questionText: row.questionText || "",
-      optionA: row.optionA || "",
-      optionB: row.optionB || "",
-      optionC: row.optionC || "",
-      optionD: row.optionD || "",
-      correctOption: row.correctOption || "A",
-      explanationText: row.explanationText || "",
-      difficultyLevel: row.difficultyLevel || "moderate",
-      languageCode: row.languageCode || "en",
-      isActive: Boolean(row.isActive),
-    });
-    setIsModalOpen(true);
-  };
-
-  const validateQuestion = (q) => {
-    if (!q.questionText.trim()) return "PLEASE ENTER QUESTION";
-    if (!q.optionA.trim() || !q.optionB.trim() || !q.optionC.trim() || !q.optionD.trim()) {
-      return "PLEASE ENTER ALL OPTIONS";
-    }
-    return "";
-  };
-
-  const addQuestionDraft = () => {
-    if (!baseForm.examMasterId || !baseForm.examCategoryId || !baseForm.subjectId) {
-      toast.error("SELECT EXAM, CATEGORY, SUBJECT FIRST");
-      return;
-    }
-    const errorMsg = validateQuestion(questionForm);
-    if (errorMsg) return toast.error(errorMsg);
-
-    setDraftQuestions((prev) => [...prev, { ...questionForm }]);
-    setQuestionForm((prev) => ({
-      ...emptyQuestion,
-      questionId: nextQsSetId(prev.questionId),
-      languageCode: prev.languageCode || "en",
-      difficultyLevel: prev.difficultyLevel || "moderate",
-      isActive: prev.isActive,
-    }));
-    toast.success("QUESTION ADDED");
-  };
-
-  const editDraftQuestion = (idx) => {
-    const item = draftQuestions[idx];
-    if (!item) return;
-    setQuestionForm({ ...item });
-    setDraftQuestions((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  const removeDraftQuestion = (idx) => {
-    setDraftQuestions((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  const saveDraftBatch = async () => {
-    if (draftQuestions.length === 0) {
-      toast.error("ADD AT LEAST ONE QUESTION");
-      return;
-    }
-    setIsSaving(true);
+  const handleViewOrEdit = async (id, canEdit) => {
     try {
-      for (const q of draftQuestions) {
-        await axios.post("/master/mock-test/upsert", {
-          ...baseForm,
-          marks: Number(baseForm.questionMarks || 1),
-          negativeMarks: Number(baseForm.negativeMark || 0),
-          ...q,
-        });
+      const res = await axios.get(`/master/mock-test/set/${id}`);
+      const row = res.data?.data;
+      if (!row) return;
+      setEditId(canEdit ? row._id : "");
+      setIsViewOnly(!canEdit);
+      setShowOnlySetQuestions(true);
+      setForm({
+        questionSetId: row.questionSetId || "",
+        examMasterId: row.examMasterId || "",
+        examCategoryId: row.examCategoryId || "",
+        subjectId: row.subjectId || "",
+        testDate: row.testDate ? new Date(row.testDate).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+        status: row.status || "ACTIVE",
+        selectionType: "MANUAL",
+        questionCount: (row.questionIds || []).length || 10,
+        questionIds: (row.questionIds || []).map((q) => (typeof q === "string" ? q : q.questionBankId || q._id)),
+      });
+      const details = Array.isArray(row.questionDetails) ? row.questionDetails : [];
+      setQuestionBankRows(details);
+      setIsModalOpen(true);
+    } catch {
+      toastErrorOnce("FAILED TO LOAD SET");
+    }
+  };
+
+  const autoPickQuestions = async (forceRestart = false) => {
+    if (isViewOnly) return toastErrorOnce("VIEW MODE ENABLED");
+    if (!form.examMasterId || !form.examCategoryId || !form.subjectId) return toastErrorOnce("SELECT EXAM, CATEGORY, SUBJECT");
+    try {
+      const params = new URLSearchParams();
+      params.set("examMasterId", form.examMasterId);
+      params.set("examCategoryId", form.examCategoryId);
+      params.set("subjectId", form.subjectId);
+      params.set("count", String(form.questionCount || 10));
+      if (forceRestart) params.set("forceRestart", "true");
+      const res = await axios.get(`/master/mock-test/suggest-questions?${params.toString()}`);
+      const data = Array.isArray(res.data?.data) ? res.data.data : [];
+      if (res.data?.exhausted && !forceRestart) {
+        const ok = window.confirm(res.data?.message || "All questions used. Start again from first?");
+        if (ok) return autoPickQuestions(true);
+        return;
       }
-      toast.success("ALL QUESTIONS SAVED");
-      setIsModalOpen(false);
-      fetchData();
+      setForm((prev) => ({ ...prev, questionIds: data.map((q) => q.questionBankId || q._id) }));
+      toastOkOnce(`SELECTED ${data.length} QUESTIONS`);
     } catch (err) {
-      toast.error(err?.response?.data?.message || "SAVE FAILED");
-    } finally {
-      setIsSaving(false);
+      toastErrorOnce(err?.response?.data?.message || "AUTO PICK FAILED");
     }
   };
 
-  const handleSubmit = async (e) => {
+  const submit = async (e) => {
     e.preventDefault();
-
-    if (!baseForm.examMasterId || !baseForm.examCategoryId || !baseForm.subjectId) {
-      return toast.error("SELECT EXAM, CATEGORY, SUBJECT");
+    if (saving) return;
+    if (isViewOnly) return;
+    if (!form.examMasterId || !form.examCategoryId || !form.subjectId) return toastErrorOnce("SELECT EXAM, CATEGORY, SUBJECT");
+    if (!form.testDate) return toastErrorOnce("SELECT TEST DATE");
+    if (!form.questionIds.length) return toastErrorOnce("SELECT QUESTIONS");
+    setSaving(true);
+    try {
+      await axios.post("/master/mock-test/upsert", {
+        id: editId || undefined,
+        questionSetId: form.questionSetId,
+        examMasterId: form.examMasterId,
+        examCategoryId: form.examCategoryId,
+        subjectId: form.subjectId,
+        testDate: form.testDate,
+        status: form.status,
+        isActive: form.status === "ACTIVE",
+        isSelectedForAttempt: false,
+        questionIds: form.questionIds,
+      });
+      toastOkOnce(editId ? "SET UPDATED" : "SET CREATED");
+      setIsModalOpen(false);
+      fetchSets();
+    } catch (err) {
+      toastErrorOnce(err?.response?.data?.message || "SAVE FAILED");
+    } finally {
+      setSaving(false);
     }
-
-    if (editId) {
-      const errorMsg = validateQuestion(questionForm);
-      if (errorMsg) return toast.error(errorMsg);
-
-      setIsSaving(true);
-      try {
-        const res = await axios.post("/master/mock-test/upsert", {
-          id: editId,
-          ...baseForm,
-          marks: Number(baseForm.questionMarks || 1),
-          negativeMarks: Number(baseForm.negativeMark || 0),
-          ...questionForm,
-        });
-        if (res.data.success) {
-          toast.success("UPDATED");
-          setIsModalOpen(false);
-          setEditId(null);
-          fetchData();
-        }
-      } catch (err) {
-        toast.error(err?.response?.data?.message || "UPDATE FAILED");
-      } finally {
-        setIsSaving(false);
-      }
-      return;
-    }
-
-    await saveDraftBatch();
   };
 
-  const handleDelete = async (id) => {
+  const selectForStudent = async (id, selected) => {
+    try {
+      await axios.post(`/master/mock-test/select-for-student/${id}`, { selected });
+      toastOkOnce(selected ? "THIS SET WILL SHOW IN STUDENT MOCK TEST" : "SET DESELECTED");
+      fetchSets();
+    } catch (err) {
+      toastErrorOnce(err?.response?.data?.message || "FAILED TO SELECT SET");
+    }
+  };
+
+  const removeSet = async (id) => {
     if (!window.confirm("ARE YOU SURE?")) return;
     try {
       await axios.delete(`/master/mock-test/${id}`);
-      toast.success("DELETED");
-      fetchData();
+      toastOkOnce("DELETED");
+      fetchSets();
     } catch {
-      toast.error("DELETE FAILED");
+      toastErrorOnce("DELETE FAILED");
     }
   };
 
   return (
-    <div className="flex flex-col h-full min-w-0 relative bg-[#F0F7FF] min-h-screen">
-      <header className="p-2 md:p-2 space-y-2">
-        <div className="bg-white px-4 py-2 rounded-[24px] border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-4">
-          <h1 className="text-lg font-semibold text-slate-900">Mock Test Master</h1>
-          <div className="flex items-center gap-3">
-            <button onClick={fetchData} className="p-2 bg-slate-50 text-slate-900 rounded-2xl border border-slate-100">
-              <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
-            </button>
-            <button onClick={openAddModal} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-2xl text-xs shadow-lg">
-              <Plus size={14} strokeWidth={3} />
-              Add New
-            </button>
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#dbeafe,_#eff6ff_38%,_#f8fafc_70%)]">
+      <header className="p-2 space-y-2">
+        <div className="px-4 py-3 rounded-[28px] border border-sky-100 bg-white/95 shadow-[0_8px_25px_rgba(2,132,199,0.12)] flex flex-col gap-3">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
+            <h1 className="text-lg font-semibold text-slate-900">Mock Test Question Sets</h1>
+            <div className="flex items-center gap-3">
+              <button onClick={fetchSets} className="p-2 bg-slate-50 text-slate-900 rounded-2xl border border-slate-100"><RefreshCw size={20} className={loading ? "animate-spin" : ""} /></button>
+              <button onClick={() => setIsQuestionModalOpen(true)} className="flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-700 hover:to-cyan-700 text-white px-4 py-2 rounded-2xl text-xs shadow-lg"><Plus size={14} strokeWidth={3} />Instant Add Question</button>
+              <button onClick={openAddModal} className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-2 rounded-2xl text-xs shadow-lg"><Plus size={14} strokeWidth={3} />Add Question Set</button>
+            </div>
           </div>
-        </div>
-
-        <div className="relative">
-          <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-900" size={20} />
-          <input
-            type="text"
-            placeholder="Search..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-14 pr-6 py-2 bg-white border-2 border-slate-100 rounded-[20px] text-sm font-semibold outline-none focus:border-blue-600"
-          />
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <select value={filters.examMasterId} onChange={(e) => { setFilters((p) => ({ ...p, examMasterId: e.target.value, examCategoryId: "", subjectId: "" })); setPagination((p) => ({ ...p, page: 1 })); }} className="p-2 border border-slate-200 rounded-xl text-sm font-normal"><option value="">All Exams</option>{exams.map((ex) => <option key={ex.examCode} value={ex.examCode}>{ex.examName}</option>)}</select>
+            <select value={filters.examCategoryId} onChange={(e) => { setFilters((p) => ({ ...p, examCategoryId: e.target.value, subjectId: "" })); setPagination((p) => ({ ...p, page: 1 })); }} className="p-2 border border-slate-200 rounded-xl text-sm font-normal"><option value="">All Categories</option>{filteredCategories.map((cat) => <option key={cat.catId} value={cat.catId}>{cat.catName}</option>)}</select>
+            <select value={filters.subjectId} onChange={(e) => { setFilters((p) => ({ ...p, subjectId: e.target.value })); setPagination((p) => ({ ...p, page: 1 })); }} className="p-2 border border-slate-200 rounded-xl text-sm font-normal"><option value="">All Subjects</option>{filteredSubjects.map((sub) => <option key={sub.syllabusId} value={sub.syllabusId}>{sub.subjectName}</option>)}</select>
+            <select value={pagination.page} onChange={(e) => setPagination((p) => ({ ...p, page: Number(e.target.value) }))} className="p-2 border border-slate-200 rounded-xl text-sm font-normal">{Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((p) => <option key={p} value={p}>Page {p}</option>)}</select>
+          </div>
         </div>
       </header>
 
-      <section className="bg-white rounded-[10px] border border-slate-100 shadow-sm overflow-hidden">
+      <section className="bg-white rounded-[12px] border border-slate-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
-            <thead>
-              <tr className="bg-[#0F172A] text-white text-[11px] font-semibold">
-                <th className="p-2">Question ID</th>
-                <th className="p-2">Exam</th>
-                <th className="p-2">Category</th>
-                <th className="p-2">Subject</th>
-                <th className="p-2">Difficulty</th>
-                <th className="p-2">Active</th>
-                <th className="p-2 text-center">Actions</th>
-              </tr>
-            </thead>
+            <thead><tr className="bg-[#0F172A] text-white text-[11px] font-semibold"><th className="p-2">Set ID</th><th className="p-2">Date</th><th className="p-2">Exam</th><th className="p-2">Category</th><th className="p-2">Subject</th><th className="p-2">Status</th><th className="p-2">Student</th><th className="p-2 text-center">Actions</th></tr></thead>
             <tbody className="divide-y divide-slate-50">
-              {loading ? (
-                <tr><td colSpan="7" className="p-20 text-center text-slate-300 font-semibold">Loading...</td></tr>
-              ) : filteredRows.length > 0 ? (
-                filteredRows.map((row) => (
-                  <tr key={row._id} className="hover:bg-blue-50/30">
-                    <td className="p-2 text-blue-600 text-sm font-semibold">{row.questionId}</td>
-                    <td className="p-2 text-xs font-semibold">{row.examName}</td>
-                    <td className="p-2 text-xs font-semibold">{row.categoryName}</td>
-                    <td className="p-2 text-xs font-semibold">{row.subjectName}</td>
-                    <td className="p-2 text-xs font-semibold">{row.difficultyLevel}</td>
-                    <td className="p-2 text-xs font-semibold">{row.isActive ? "YES" : "NO"}</td>
-                    <td className="p-2 flex justify-center gap-2">
-                      <button onClick={() => handleEdit(row)} className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-                        <Edit size={16} />
+              {loading ? <tr><td colSpan="8" className="p-20 text-center text-slate-300 font-semibold">Loading...</td></tr> : sets.length > 0 ? sets.map((row) => (
+                <tr key={row._id} className="hover:bg-blue-50/30">
+                  <td className="p-2 text-blue-600 text-sm font-semibold">{row.questionSetId}</td><td className="p-2 text-xs font-normal">{new Date(row.testDate).toLocaleDateString()}</td><td className="p-2 text-xs font-normal">{row.examName}</td><td className="p-2 text-xs font-normal">{row.categoryName}</td><td className="p-2 text-xs font-normal">{row.subjectName}</td><td className="p-2 text-xs font-normal">{row.status}</td>
+                  <td className="p-2 text-xs font-semibold">
+                    {row.isSelectedForAttempt ? (
+                      <button onClick={() => selectForStudent(row._id, false)} className="px-3 py-1 rounded-full bg-gradient-to-r from-emerald-500 to-green-500 text-white hover:from-rose-500 hover:to-red-500 text-[11px] shadow-sm">
+                        Visible (Click Hide)
                       </button>
-                      <button onClick={() => handleDelete(row._id)} className="p-2 bg-red-50 text-red-400 rounded-xl">
-                        <Trash2 size={16} />
+                    ) : (
+                      <button onClick={() => selectForStudent(row._id, true)} className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 hover:bg-blue-600 hover:text-white text-[11px] border border-slate-200">
+                        Hidden (Click Show)
                       </button>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr><td colSpan="7" className="p-20 text-center text-slate-300 font-semibold">No Records</td></tr>
-              )}
+                    )}
+                  </td>
+                  <td className="p-2 flex justify-center gap-2"><button onClick={() => handleViewOrEdit(row._id, false)} className="p-2 bg-slate-100 text-slate-600 rounded-xl"><Eye size={16} /></button><button onClick={() => handleViewOrEdit(row._id, true)} className="p-2 bg-blue-50 text-blue-600 rounded-xl"><Edit size={16} /></button><button onClick={() => removeSet(row._id)} className="p-2 bg-red-50 text-red-400 rounded-xl"><Trash2 size={16} /></button></td>
+                </tr>
+              )) : <tr><td colSpan="8" className="p-20 text-center text-slate-300 font-semibold">No Records</td></tr>}
             </tbody>
           </table>
         </div>
@@ -402,203 +402,79 @@ const MockTest = () => {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}></div>
-
-          <form onSubmit={handleSubmit} className="relative bg-white w-full max-w-6xl p-8 rounded-[30px] shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold">{editId ? "Update Question" : "Add Multiple Questions"}</h2>
-              <button type="button" onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full">
-                <X size={20} />
-              </button>
+          <div className="absolute inset-0 bg-slate-900/45 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}></div>
+          <form onSubmit={submit} className="relative bg-white w-full max-w-6xl p-6 rounded-[28px] shadow-2xl max-h-[90vh] overflow-y-auto border border-sky-100">
+            <div className="flex justify-between items-center mb-4"><h2 className="text-xl font-semibold">{editId ? "Edit Question Set" : "Add Question Set"}</h2><button type="button" onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full"><X size={20} /></button></div>
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+              <input value={form.questionSetId} readOnly className="p-2 border border-slate-200 rounded-xl text-sm font-normal bg-slate-50" />
+              <input disabled={isViewOnly} type="date" value={form.testDate} onChange={(e) => setForm((p) => ({ ...p, testDate: e.target.value }))} className="p-2 border border-slate-200 rounded-xl text-sm font-normal disabled:bg-slate-100" />
+              <select disabled={isViewOnly} value={form.examMasterId} onChange={(e) => setForm((p) => ({ ...p, examMasterId: e.target.value, examCategoryId: "", subjectId: "", questionIds: [] }))} className="p-2 border border-slate-200 rounded-xl text-sm font-normal disabled:bg-slate-100"><option value="">Exam</option>{exams.map((ex) => <option key={ex.examCode} value={ex.examCode}>{ex.examName}</option>)}</select>
+              <select disabled={isViewOnly} value={form.examCategoryId} onChange={(e) => setForm((p) => ({ ...p, examCategoryId: e.target.value, subjectId: "", questionIds: [] }))} className="p-2 border border-slate-200 rounded-xl text-sm font-normal disabled:bg-slate-100"><option value="">Category</option>{modalFilteredCategories.map((cat) => <option key={cat.catId} value={cat.catId}>{cat.catName}</option>)}</select>
+              <select disabled={isViewOnly} value={form.subjectId} onChange={async (e) => { const sid = e.target.value; setForm((p) => ({ ...p, subjectId: sid, questionIds: [] })); await fetchQuestionBankRows(sid); }} className="p-2 border border-slate-200 rounded-xl text-sm font-normal disabled:bg-slate-100"><option value="">Subject</option>{modalFilteredSubjects.map((sub) => <option key={sub.syllabusId} value={sub.syllabusId}>{sub.subjectName}</option>)}</select>
+              <select disabled={isViewOnly} value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))} className="p-2 border border-slate-200 rounded-xl text-sm font-normal disabled:bg-slate-100"><option value="ACTIVE">ACTIVE</option><option value="INACTIVE">INACTIVE</option></select>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-              <div>
-                <label className="text-sm font-semibold text-slate-900 mb-1 block">Exam</label>
-                <select
-                  required
-                  value={baseForm.examMasterId}
-                  onChange={(e) => setBaseForm({ ...baseForm, examMasterId: e.target.value, examCategoryId: "", subjectId: "" })}
-                  className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-600"
-                >
-                  <option value="">-- Select Exam --</option>
-                  {exams.map((ex) => <option key={ex._id} value={ex._id}>{ex.examName}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-sm font-semibold text-slate-900 mb-1 block">Category</label>
-                <select
-                  required
-                  value={baseForm.examCategoryId}
-                  onChange={(e) => setBaseForm({ ...baseForm, examCategoryId: e.target.value, subjectId: "" })}
-                  className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-600"
-                >
-                  <option value="">-- Select Category --</option>
-                  {filteredCategories.map((cat) => <option key={cat._id} value={cat._id}>{cat.catName}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-sm font-semibold text-slate-900 mb-1 block">Subject</label>
-                <select
-                  required
-                  value={baseForm.subjectId}
-                  onChange={(e) => setBaseForm({ ...baseForm, subjectId: e.target.value })}
-                  className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-600"
-                >
-                  <option value="">-- Select Subject --</option>
-                  {filteredSubjects.map((sub) => <option key={sub._id} value={sub._id}>{sub.subjectName}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-sm font-semibold text-slate-900 mb-1 block">Marks / Question</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  value={baseForm.questionMarks}
-                  onChange={(e) => setBaseForm({ ...baseForm, questionMarks: Number(e.target.value) })}
-                  className="w-full p-3 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-600"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-semibold text-slate-900 mb-1 block">Negative Mark</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.25"
-                  value={baseForm.negativeMark}
-                  onChange={(e) => setBaseForm({ ...baseForm, negativeMark: Number(e.target.value) })}
-                  className="w-full p-3 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-600"
-                />
-              </div>
-            </div>
-
-            <div className="mt-5 border border-slate-200 rounded-2xl p-4 bg-slate-50">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-semibold text-slate-900 mb-1 block">Question ID</label>
-                  <div className="p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-blue-600">
-                    {questionForm.questionId || "..."}
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm font-semibold text-slate-900 mb-1 block">Difficulty</label>
-                  <select
-                    value={questionForm.difficultyLevel}
-                    onChange={(e) => setQuestionForm({ ...questionForm, difficultyLevel: e.target.value })}
-                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-600"
-                  >
-                    <option value="easy">easy</option>
-                    <option value="moderate">moderate</option>
-                    <option value="hard">hard</option>
-                  </select>
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="text-sm font-semibold text-slate-900 mb-1 block">Question Text</label>
-                  <textarea
-                    value={questionForm.questionText}
-                    onChange={(e) => setQuestionForm({ ...questionForm, questionText: e.target.value })}
-                    className="w-full p-3 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-600"
-                  />
-                </div>
-
-                <div><label className="text-sm font-semibold block mb-1">Option A</label><input value={questionForm.optionA} onChange={(e) => setQuestionForm({ ...questionForm, optionA: e.target.value })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-600" /></div>
-                <div><label className="text-sm font-semibold block mb-1">Option B</label><input value={questionForm.optionB} onChange={(e) => setQuestionForm({ ...questionForm, optionB: e.target.value })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-600" /></div>
-                <div><label className="text-sm font-semibold block mb-1">Option C</label><input value={questionForm.optionC} onChange={(e) => setQuestionForm({ ...questionForm, optionC: e.target.value })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-600" /></div>
-                <div><label className="text-sm font-semibold block mb-1">Option D</label><input value={questionForm.optionD} onChange={(e) => setQuestionForm({ ...questionForm, optionD: e.target.value })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-600" /></div>
-
-                <div>
-                  <label className="text-sm font-semibold text-slate-900 mb-1 block">Correct Option</label>
-                  <select
-                    value={questionForm.correctOption}
-                    onChange={(e) => setQuestionForm({ ...questionForm, correctOption: e.target.value })}
-                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-600"
-                  >
-                    <option value="A">A</option>
-                    <option value="B">B</option>
-                    <option value="C">C</option>
-                    <option value="D">D</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-sm font-semibold text-slate-900 mb-1 block">Language Code</label>
-                  <input
-                    value={questionForm.languageCode}
-                    onChange={(e) => setQuestionForm({ ...questionForm, languageCode: e.target.value })}
-                    className="w-full p-3 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-600"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="text-sm font-semibold text-slate-900 mb-1 block">Explanation Text</label>
-                  <textarea
-                    value={questionForm.explanationText}
-                    onChange={(e) => setQuestionForm({ ...questionForm, explanationText: e.target.value })}
-                    className="w-full p-3 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-600"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <button
-                    type="button"
-                    onClick={() => setQuestionForm({ ...questionForm, isActive: !questionForm.isActive })}
-                    className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-semibold ${
-                      questionForm.isActive
-                        ? "bg-emerald-50 border-emerald-200 text-emerald-700"
-                        : "bg-slate-50 border-slate-200 text-slate-700"
-                    }`}
-                  >
-                    {questionForm.isActive ? <CheckSquare size={14} /> : <Square size={14} />}
-                    Is Active
-                  </button>
-                </div>
-              </div>
-
-              {!editId && (
-                <button
-                  type="button"
-                  onClick={addQuestionDraft}
-                  className="mt-4 w-full py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700"
-                >
-                  Save Question In Draft List
-                </button>
-              )}
-            </div>
-
             {!editId && (
-              <div className="mt-5 space-y-2">
-                {draftQuestions.map((q, idx) => (
-                  <div key={`${q.questionId}-${idx}`} className="bg-white border border-slate-200 rounded-xl p-3 flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-blue-700">{q.questionId}</p>
-                      <p className="text-sm font-semibold text-slate-800">{q.questionText}</p>
-                      <p className="text-xs font-semibold text-slate-500">
-                        Correct: {q.correctOption} | {q.difficultyLevel} | Marks: {baseForm.questionMarks} | Negative: {baseForm.negativeMark}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button type="button" onClick={() => editDraftQuestion(idx)} className="p-2 bg-blue-50 text-blue-600 rounded-xl"><Edit size={15} /></button>
-                      <button type="button" onClick={() => removeDraftQuestion(idx)} className="p-2 bg-red-50 text-red-500 rounded-xl"><Trash2 size={15} /></button>
-                    </div>
-                  </div>
-                ))}
+              <div className="mt-4 border border-slate-200 rounded-2xl p-3 bg-gradient-to-r from-cyan-50 to-blue-50">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <select value={form.selectionType} onChange={(e) => setForm((p) => ({ ...p, selectionType: e.target.value, questionIds: [] }))} className="p-2 border border-slate-200 rounded-xl text-sm font-normal"><option value="AUTO">AUTO NEXT QUESTIONS</option><option value="MANUAL">MANUAL SELECT</option></select>
+                  <input type="number" min="1" value={form.questionCount} onChange={(e) => setForm((p) => ({ ...p, questionCount: Number(e.target.value) }))} className="p-2 border border-slate-200 rounded-xl text-sm font-normal" />
+                  {form.selectionType === "AUTO" ? <button type="button" onClick={() => autoPickQuestions(false)} className="px-3 py-2 bg-blue-600 text-white text-xs rounded-lg">Auto Pick Next Questions</button> : <div className="px-3 py-2 text-xs text-slate-500 rounded-lg bg-white border border-slate-200">Manual mode enabled</div>}
+                </div>
               </div>
             )}
-
-            <button
-              disabled={isSaving}
-              className="w-full py-4 mt-6 bg-[#0F172A] text-white rounded-2xl hover:bg-blue-600 transition-all flex justify-center items-center gap-3 text-sm font-semibold"
-            >
-              {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-              {editId ? "Update Question" : "Save All Draft Questions"}
-            </button>
+            {editId && (
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (showOnlySetQuestions) {
+                      await fetchQuestionBankRows(form.subjectId);
+                      setShowOnlySetQuestions(false);
+                    } else {
+                      const res = await axios.get(`/master/mock-test/set/${editId}`);
+                      const row = res.data?.data;
+                      setQuestionBankRows(Array.isArray(row?.questionDetails) ? row.questionDetails : []);
+                      setShowOnlySetQuestions(true);
+                    }
+                  }}
+                  className="px-3 py-2 text-xs rounded-lg bg-slate-100 text-slate-700"
+                >
+                  {showOnlySetQuestions ? "Show All Subject Questions" : "Show Only This Set Questions"}
+                </button>
+              </div>
+            )}
+            <div className="mt-4 border border-slate-200 rounded-2xl overflow-hidden">
+              <div className="max-h-[40vh] overflow-auto">
+                <table className="w-full text-left"><thead><tr className="bg-slate-100 text-slate-700 text-xs font-semibold"><th className="p-2">Select</th><th className="p-2">Q.ID</th><th className="p-2">Question</th><th className="p-2">Marks</th><th className="p-2">Negative</th></tr></thead>
+                  <tbody>
+                    {questionBankRows.map((q) => {
+                      const qbId = q.questionBankId || q._id;
+                      const checked = form.questionIds.includes(qbId);
+                      return (
+                        <tr key={qbId} className="border-t border-slate-100">
+                          <td className="p-2"><input type="checkbox" checked={checked} onChange={() => setForm((prev) => ({ ...prev, questionIds: checked ? prev.questionIds.filter((x) => x !== qbId) : [...prev.questionIds, qbId] }))} disabled={isViewOnly || (!editId && form.selectionType === "AUTO")} /></td>
+                          <td className="p-2 text-xs font-semibold text-blue-600">{q.questionBankId}</td><td className="p-2 text-xs font-normal">{q.questionText}</td><td className="p-2 text-xs font-normal">{q.marks}</td><td className="p-2 text-xs font-normal">{q.negativeMarks}</td>
+                        </tr>
+                      );
+                    })}
+                    {questionBankRows.length === 0 && <tr><td colSpan="5" className="p-6 text-center text-xs text-slate-400">No questions found for selected subject.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <p className="mt-3 text-xs font-semibold text-slate-600">Selected Questions: {form.questionIds.length}</p>
+            {!isViewOnly && <button disabled={saving} className="w-full py-3 mt-4 bg-[#0F172A] text-white rounded-xl flex items-center justify-center gap-2 text-sm font-normal">{saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}{editId ? "Update Set" : "Create Set"}</button>}
           </form>
+        </div>
+      )}
+
+      {isQuestionModalOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsQuestionModalOpen(false)}></div>
+          <div className="relative bg-white w-full max-w-5xl p-6 rounded-[28px] shadow-2xl max-h-[90vh] overflow-y-auto border border-cyan-100">
+            <div className="flex justify-between items-center mb-4"><h2 className="text-lg font-semibold">Instant Add Question</h2><button type="button" onClick={() => setIsQuestionModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full"><X size={20} /></button></div>
+            <QuestionInlineForm exams={exams} categories={categories} subjects={subjects} onSaved={(sid) => fetchQuestionBankRows(sid || form.subjectId)} />
+          </div>
         </div>
       )}
     </div>
