@@ -18,6 +18,7 @@ const CategoryMaster = () => {
   const [formData, setFormData] = useState({ 
     catId: "", 
     examId: "", 
+    examStage: "",
     catName: "", 
     features: [],
     status: "ACTIVE",
@@ -65,7 +66,7 @@ const CategoryMaster = () => {
 
   const openAddForm = () => {
     setEditId(null);
-    setFormData({ catId: "", examId: "", catName: "", features: [], status: "ACTIVE" });
+    setFormData({ catId: "", examId: "", examStage: "", catName: "", features: [], status: "ACTIVE" });
     fetchData();
     setIsFormOpen(true);
   };
@@ -82,6 +83,7 @@ const CategoryMaster = () => {
     setFormData({
       catId: cat.catId,
       examId: matchedExam?._id || "",
+      examStage: cat.examStage || "",
       catName: cat.catName,
       features: cat.features || [],
       status: cat.status || "ACTIVE",
@@ -130,6 +132,7 @@ const CategoryMaster = () => {
     c.catName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (c.examName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
     (c.examCode || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (c.examStage || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
     (c.status || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -189,10 +192,11 @@ const CategoryMaster = () => {
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
-              <tr className="bg-[#0F172A] text-white text-[10px] font-black uppercase tracking-widest">
+              <tr className="bg-[#0F172A] text-white text-[11px] font-black uppercase tracking-widest">
                 <th className="p-2">ID</th>
                 <th className="p-2">Exam</th>
                 <th className="p-2">Category Name</th>
+                 <th className="p-2">Exam Stage</th>
                 <th className="p-2">Features</th>
                 <th className="p-2">Status</th>
                 <th className="p-2 text-center">Actions</th>
@@ -200,14 +204,18 @@ const CategoryMaster = () => {
             </thead>
             <tbody className="divide-y divide-slate-50">
               {loading ? (
-                <tr><td colSpan="6" className="p-20 text-center animate-pulse font-black text-slate-300 uppercase">Loading Records...</td></tr>
+                <tr><td colSpan="7" className="p-20 text-center animate-pulse font-black text-slate-300 uppercase">Loading Records...</td></tr>
               ) : filteredCategories.map(cat => (
                 <tr key={cat._id} className="hover:bg-blue-50/30 transition-all">
-                  <td className="p-2 font-black text-blue-600 text-sm">{cat.catId}</td>
-                  <td className="p-2 font-black text-slate-900 text-[10px] uppercase">
+                  <td className="p-2 font-black text-blue-600 text-[12px]">{cat.catId}</td>
+                  <td className="p-2 font-black text-slate-900 text-[11px] uppercase">
                     {cat.examName || "---"}
                   </td>
-                  <td className="p-2 font-black text-slate-800 text-sm uppercase">{cat.catName}</td>
+                 
+                  <td className="p-2 font-black text-slate-800 text-[11px] uppercase">{cat.catName}</td>
+                   <td className="p-2 text-[11px] font-semibold text-slate-700">
+                    {cat.examStage || "---"}
+                  </td>
                   <td className="p-2">
                     <div className="flex flex-wrap gap-1">
                       {cat.features.slice(0, 2).map(f => (
@@ -286,6 +294,8 @@ const CategoryMaster = () => {
                 </div>
               </div>
 
+       
+
               <div>
                 <label className="text-sm font-semibold text-slate-900 mb-1 block">Category Name</label>
                 <input 
@@ -296,7 +306,18 @@ const CategoryMaster = () => {
                   onChange={(e) => setFormData({...formData, catName: e.target.value.toUpperCase()})}
                 />
               </div>
-
+                <div>
+                <label className="text-sm font-semibold text-slate-900 mb-1 block">
+                  Exam Stage (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. PRE, MAINS, PHASE-1"
+                  className="w-full p-3 border border-slate-200 rounded-xl font-semibold text-[11px] outline-none focus:border-blue-600"
+                  value={formData.examStage}
+                  onChange={(e) => setFormData({ ...formData, examStage: e.target.value.toUpperCase() })}
+                />
+              </div>
               <div>
                 <label className="text-sm font-semibold text-slate-900 mb-3 block">Features</label>
                 <div className="flex flex-wrap gap-2">

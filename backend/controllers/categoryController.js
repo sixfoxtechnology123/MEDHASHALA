@@ -25,7 +25,7 @@ exports.getNextCategoryId = async (req, res) => {
 
 exports.upsertCategory = async (req, res) => {
   try {
-    const { id, catId, examId, catName, features = [], status = "ACTIVE" } = req.body;
+    const { id, catId, examId, catName, examStage, features = [], status = "ACTIVE" } = req.body;
 
     if (!examId || !mongoose.isValidObjectId(examId)) {
       return res.status(400).json({ success: false, message: "VALID EXAM REQUIRED" });
@@ -46,6 +46,7 @@ exports.upsertCategory = async (req, res) => {
       status: String(status).toUpperCase() === "INACTIVE" ? "INACTIVE" : "ACTIVE",
       examName: selectedExam.examName,
       examCode: selectedExam.examCode,
+      examStage: String(examStage || "").trim().toUpperCase() || undefined,
     };
 
     if (id) {

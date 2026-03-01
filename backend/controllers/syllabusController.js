@@ -43,7 +43,18 @@ exports.getAllSyllabus = async (req, res) => {
       }
     );
 
-    const rows = await Syllabus.find().sort({ createdAt: 1 });
+    const filter = {};
+    if (String(req.query?.examCode || "").trim()) {
+      filter.examCode = String(req.query.examCode).trim().toUpperCase();
+    }
+    if (String(req.query?.catId || "").trim()) {
+      filter.catId = String(req.query.catId).trim().toUpperCase();
+    }
+    if (String(req.query?.examStage || "").trim()) {
+      filter.examStage = String(req.query.examStage).trim().toUpperCase();
+    }
+
+    const rows = await Syllabus.find(filter).sort({ createdAt: 1 });
     res.json({ success: true, data: rows });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -90,7 +101,7 @@ exports.upsertSyllabus = async (req, res) => {
       return res.status(404).json({ success: false, message: "EXAM NOT FOUND" });
     }
 
-    const selectedCategory = await Category.findById(categoryId).select("catId catName examName examCode");
+    const selectedCategory = await Category.findById(categoryId).select("catId catName examName examCode examStage");
     if (!selectedCategory) {
       return res.status(404).json({ success: false, message: "CATEGORY NOT FOUND" });
     }
@@ -104,6 +115,7 @@ exports.upsertSyllabus = async (req, res) => {
     const payload = {
       examName: selectedExam.examName,
       examCode: selectedExam.examCode,
+      examStage: String(selectedCategory.examStage || "").trim().toUpperCase() || undefined,
       catId: selectedCategory.catId,
       catName: selectedCategory.catName,
       subjectName: String(subjectName).trim().toUpperCase(),

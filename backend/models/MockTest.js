@@ -11,6 +11,7 @@ const mockTestSchema = new mongoose.Schema(
 
     examName: { type: String, required: true, trim: true, uppercase: true },
     examCode: { type: String, required: true, trim: true, uppercase: true },
+    examStage: { type: String, trim: true, uppercase: true },
     categoryName: { type: String, required: true, trim: true, uppercase: true },
     categoryCode: { type: String, required: true, trim: true, uppercase: true },
     subjectName: { type: String, required: true, trim: true, uppercase: true },

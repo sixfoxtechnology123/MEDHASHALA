@@ -25,10 +25,16 @@ const SyllabusMaster = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [listFilters, setListFilters] = useState({
+    examCode: "",
+    examStage: "",
+    catId: "",
+  });
 
   const [formData, setFormData] = useState({
     syllabusId: "",
     examId: "",
+    examStage: "",
     categoryId: "",
     subjectName: "",
     status: "ACTIVE",
@@ -83,24 +89,60 @@ const SyllabusMaster = () => {
 
   const filteredRows = useMemo(() => {
     const q = searchTerm.toLowerCase();
-    return syllabusRows.filter(
-      (row) =>
+    return syllabusRows.filter((row) => {
+      const matchesFilters =
+        (!listFilters.examCode ||
+          String(row.examCode || "").toUpperCase() === String(listFilters.examCode || "").toUpperCase()) &&
+        (!listFilters.examStage ||
+          String(row.examStage || "").toUpperCase() === String(listFilters.examStage || "").toUpperCase()) &&
+        (!listFilters.catId ||
+          String(row.catId || "").toUpperCase() === String(listFilters.catId || "").toUpperCase());
+
+      const matchesSearch =
         (row.syllabusId || "").toLowerCase().includes(q) ||
         (row.examName || "").toLowerCase().includes(q) ||
         (row.catName || "").toLowerCase().includes(q) ||
         (row.subjectName || "").toLowerCase().includes(q) ||
-        (row.status || "").toLowerCase().includes(q)
-    );
-  }, [searchTerm, syllabusRows]);
+        (row.status || "").toLowerCase().includes(q);
+
+      return matchesFilters && matchesSearch;
+    });
+  }, [listFilters.catId, listFilters.examCode, listFilters.examStage, searchTerm, syllabusRows]);
 
   const filteredCategories = useMemo(() => {
     const selectedExam = exams.find((ex) => String(ex._id) === String(formData.examId));
     if (!selectedExam) return [];
     return categories.filter(
-      (cat) =>
-        String(cat.examCode || "").toUpperCase() === String(selectedExam.examCode || "").toUpperCase()
+      (cat) => String(cat.examCode || "").toUpperCase() === String(selectedExam.examCode || "").toUpperCase()
     );
   }, [categories, exams, formData.examId]);
+
+  const listFilterCategories = useMemo(() => {
+    if (!listFilters.examCode) return [];
+    return categories.filter(
+      (cat) => String(cat.examCode || "").toUpperCase() === String(listFilters.examCode || "").toUpperCase()
+    );
+  }, [categories, listFilters.examCode]);
+
+  const stageOptionsForForm = useMemo(() => {
+    const selectedCategory = categories.find((cat) => String(cat._id) === String(formData.categoryId));
+    return selectedCategory?.examStage ? [String(selectedCategory.examStage).toUpperCase()] : [];
+  }, [categories, formData.categoryId]);
+
+  const stageOptionsForList = useMemo(() => {
+    if (!listFilters.examCode || !listFilters.catId) return [];
+    const selectedCategory = categories.find(
+      (cat) =>
+        String(cat.examCode || "").toUpperCase() === String(listFilters.examCode || "").toUpperCase() &&
+        String(cat.catId || "").toUpperCase() === String(listFilters.catId || "").toUpperCase()
+    );
+    return selectedCategory?.examStage ? [String(selectedCategory.examStage).toUpperCase()] : [];
+  }, [categories, listFilters.examCode, listFilters.catId]);
+
+  const hasExamStageInList = useMemo(
+    () => filteredRows.some((row) => String(row.examStage || "").trim()),
+    [filteredRows]
+  );
 
   const openAddModal = async () => {
     setEditId(null);
@@ -109,6 +151,7 @@ const SyllabusMaster = () => {
       setFormData({
         syllabusId: idRes.data?.nextId || "",
         examId: "",
+        examStage: "",
         categoryId: "",
         subjectName: "",
         status: "ACTIVE",
@@ -139,6 +182,7 @@ const SyllabusMaster = () => {
     setFormData({
       syllabusId: row.syllabusId,
       examId: exam?._id || "",
+      examStage: row.examStage || cat?.examStage || "",
       categoryId: cat?._id || "",
       subjectName: row.subjectName || "",
       status: row.status || "ACTIVE",
@@ -290,18 +334,75 @@ const SyllabusMaster = () => {
             placeholder="SEARCH RECORDS..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-14 pr-6 py-2 bg-white border-2 border-slate-100 rounded-[20px] font-black text-sm outline-none focus:border-blue-600 uppercase transition-all shadow-sm"
+            className="w-full pl-14 pr-6 py-2 bg-white border-2 border-slate-100 rounded-[20px] font-black text-[11px] outline-none focus:border-blue-600 uppercase transition-all shadow-sm"
           />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+          <select
+            value={listFilters.examCode}
+            onChange={(e) =>
+              setListFilters({ examCode: e.target.value, examStage: "", catId: "" })
+            }
+            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-semibold text-[11px] outline-none focus:border-blue-600"
+          >
+            <option value="">All Exams</option>
+            {exams.map((ex) => (
+              <option key={ex.examCode} value={ex.examCode}>
+                {ex.examName}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={listFilters.catId}
+            onChange={(e) => {
+              const selectedCategory = categories.find(
+                (cat) =>
+                  String(cat.examCode || "").toUpperCase() === String(listFilters.examCode || "").toUpperCase() &&
+                  String(cat.catId || "").toUpperCase() === String(e.target.value || "").toUpperCase()
+              );
+              setListFilters((prev) => ({
+                ...prev,
+                catId: e.target.value,
+                examStage: selectedCategory?.examStage || "",
+              }));
+            }}
+            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-semibold text-[11px] outline-none focus:border-blue-600"
+          >
+            <option value="">All Categories</option>
+            {listFilterCategories.map((cat) => (
+              <option key={cat.catId} value={cat.catId}>
+                {cat.catName}
+              </option>
+            ))}
+          </select>
+
+          {stageOptionsForList.length > 0 && (
+            <select
+              value={listFilters.examStage}
+              onChange={(e) => setListFilters((prev) => ({ ...prev, examStage: e.target.value }))}
+              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-semibold text-[11px] outline-none focus:border-blue-600"
+            >
+              <option value="">All Stages</option>
+              {stageOptionsForList.map((stage) => (
+                <option key={stage} value={stage}>
+                  {stage}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </header>
 
       <section className="bg-white rounded-[10px] border border-slate-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
+          <table className="w-full text-left text-[11px]">
             <thead>
               <tr className="bg-[#0F172A] text-white text-[10px] font-black uppercase tracking-widest">
                 <th className="p-2">ID</th>
                 <th className="p-2">Exam</th>
+                {hasExamStageInList && <th className="p-2">Stage</th>}
                 <th className="p-2">Category</th>
                 <th className="p-2">Subject</th>
                 <th className="p-2">Topics</th>
@@ -312,23 +413,26 @@ const SyllabusMaster = () => {
             <tbody className="divide-y divide-slate-50">
               {loading ? (
                 <tr>
-                  <td colSpan="7" className="p-20 text-center animate-pulse font-black text-slate-300 uppercase">
+                  <td colSpan={hasExamStageInList ? 8 : 7} className="p-10 text-center animate-pulse font-black text-slate-300 uppercase">
                     Loading Records...
                   </td>
                 </tr>
               ) : filteredRows.length > 0 ? (
                 filteredRows.map((row) => (
                   <tr key={row._id} className="hover:bg-blue-50/30 transition-all align-top">
-                    <td className="p-2 font-black text-blue-600 text-sm">{row.syllabusId}</td>
-                    <td className="p-2 font-black text-slate-900 text-sm uppercase">{row.examName}</td>
-                    <td className="p-2 font-black text-slate-800 text-sm uppercase">{row.catName}</td>
-                    <td className="p-2 font-black text-slate-800 text-sm uppercase">{row.subjectName}</td>
+                    <td className="p-2 font-black text-blue-600 text-[12px]">{row.syllabusId}</td>
+                    <td className="p-2 font-black text-slate-900 text-[11px] uppercase">{row.examName}</td>
+                    {hasExamStageInList && (
+                      <td className="p-2 text-slate-700 text-[11px] font-semibold">{row.examStage || "---"}</td>
+                    )}
+                    <td className="p-2 font-black text-slate-800 text-[11px] uppercase">{row.catName}</td>
+                    <td className="p-2 font-black text-slate-800 text-[11px] uppercase">{row.subjectName}</td>
                     <td className="p-2">
                       <div className="space-y-1">
                         {(row.topics || []).map((topic, idx) => (
-                          <div key={`${row._id}-topic-${idx}`} className="text-[10px]">
+                          <div key={`${row._id}-topic-${idx}`} className="text-[11px]">
                             <p className="font-semibold text-black uppercase">{topic.topicName}</p>
-                            <ol className="list-[lower-roman] list-inside text-slate-600">
+                            <ol className="list-[lower-roman] list-inside text-slate-700">
                               {(topic.subTopics || []).map((sub, sIdx) => (
                                 <li key={`${row._id}-topic-${idx}-sub-${sIdx}`} className="uppercase">
                                   {sub}
@@ -368,7 +472,7 @@ const SyllabusMaster = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="7" className="p-20 text-center font-black text-slate-300 uppercase text-xl">
+                  <td colSpan={hasExamStageInList ? 8 : 7} className="p-10 text-center font-black text-slate-300 uppercase text-lg">
                     No Records Found
                   </td>
                 </tr>
@@ -387,7 +491,7 @@ const SyllabusMaster = () => {
 
           <form
             onSubmit={handleSubmit}
-            className="relative bg-white w-full max-w-4xl p-8 rounded-[40px] shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
+            className="relative bg-white w-full max-w-3xl p-6 rounded-[32px] shadow-2xl overflow-hidden max-h-[88vh] overflow-y-auto"
           >
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-black uppercase tracking-tighter">
@@ -405,7 +509,7 @@ const SyllabusMaster = () => {
             <div className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-semibold text-slate-900 mb-1 block">
+                  <label className="text-[11px] font-semibold text-slate-900 mb-1 block">
                     Syllabus ID
                   </label>
                   <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-blue-600 text-[11px]">
@@ -414,7 +518,7 @@ const SyllabusMaster = () => {
                 </div>
 
                 <div>
-                  <label className="text-sm font-semibold text-slate-900 mb-1 block">Status</label>
+                  <label className="text-[11px] font-semibold text-slate-900 mb-1 block">Status</label>
                   <select
                     value={formData.status}
                     onChange={(e) => setFormData({ ...formData, status: e.target.value })}
@@ -428,12 +532,12 @@ const SyllabusMaster = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-semibold text-slate-900 mb-1 block">Exam Name</label>
+                  <label className="text-[11px] font-semibold text-slate-900 mb-1 block">Exam Name</label>
                   <select
                     required
                     value={formData.examId}
                     onChange={(e) =>
-                      setFormData({ ...formData, examId: e.target.value, categoryId: "" })
+                      setFormData({ ...formData, examId: e.target.value, examStage: "", categoryId: "" })
                     }
                     className="w-full p-3 bg-white border border-slate-200 rounded-xl font-semibold text-[11px] outline-none focus:border-blue-600"
                   >
@@ -447,13 +551,20 @@ const SyllabusMaster = () => {
                 </div>
 
                 <div>
-                  <label className="text-sm font-semibold text-slate-900 mb-1 block">
+                  <label className="text-[11px] font-semibold text-slate-900 mb-1 block">
                     Category Name
                   </label>
                   <select
                     required
                     value={formData.categoryId}
-                    onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+                    onChange={(e) => {
+                      const selectedCategory = categories.find((cat) => String(cat._id) === String(e.target.value));
+                      setFormData({
+                        ...formData,
+                        categoryId: e.target.value,
+                        examStage: selectedCategory?.examStage || "",
+                      });
+                    }}
                     className="w-full p-3 bg-white border border-slate-200 rounded-xl font-semibold text-[11px] outline-none focus:border-blue-600"
                   >
                     <option value="">-- SELECT CATEGORY --</option>
@@ -464,10 +575,30 @@ const SyllabusMaster = () => {
                     ))}
                   </select>
                 </div>
+
+                {stageOptionsForForm.length > 0 && (
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-900 mb-1 block">Exam Stage</label>
+                    <select
+                      value={formData.examStage}
+                      onChange={(e) =>
+                        setFormData({ ...formData, examStage: e.target.value })
+                      }
+                      className="w-full p-3 bg-white border border-slate-200 rounded-xl font-semibold text-[11px] outline-none focus:border-blue-600"
+                    >
+                      <option value="">-- SELECT STAGE --</option>
+                      {stageOptionsForForm.map((stage) => (
+                        <option key={stage} value={stage}>
+                          {stage}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
               <div>
-                <label className="text-sm font-semibold text-slate-900 mb-1 block">Subject Name</label>
+                <label className="text-[11px] font-semibold text-slate-900 mb-1 block">Subject Name</label>
                 <input
                   required
                   type="text"
@@ -484,7 +615,7 @@ const SyllabusMaster = () => {
 
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-4">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-semibold text-slate-900 block">
+                  <label className="text-[11px] font-semibold text-slate-900 block">
                     Topic + Sub Topic 
                   </label>
                 </div>

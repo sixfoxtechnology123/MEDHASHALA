@@ -26,9 +26,9 @@ const resolveCategory = async (catInput, examCode) => {
   const categoryByCode = await Category.findOne({
     catId: String(catInput).trim().toUpperCase(),
     examCode: String(examCode || "").trim().toUpperCase(),
-  }).select("catName catId examCode");
+  }).select("catName catId examCode examStage");
   if (categoryByCode) return categoryByCode;
-  return Category.findById(catInput).select("catName catId examCode");
+  return Category.findById(catInput).select("catName catId examCode examStage");
 };
 
 const resolveSubject = async (subjectInput, examCode, catId) => {
@@ -74,6 +74,7 @@ const buildHierarchyPayload = async ({ examMasterId, examCategoryId, subjectId }
     subjectId: String(selectedSubject.syllabusId || "").toUpperCase(),
     examName: selectedExam.examName,
     examCode: selectedExam.examCode,
+    examStage: String(selectedCategory.examStage || "").trim().toUpperCase() || undefined,
     categoryName: selectedCategory.catName,
     categoryCode: selectedCategory.catId,
     subjectName: selectedSubject.subjectName,
@@ -170,11 +171,12 @@ exports.getNextQuestionSetId = async (req, res) => {
 
 exports.getAllMockTests = async (req, res) => {
   try {
-    const { examMasterId, examCategoryId, subjectId, page = 1, limit = 10 } = req.query;
+    const { examMasterId, examCategoryId, subjectId, examStage, page = 1, limit = 10 } = req.query;
     const filter = {};
     if (examMasterId) filter.examMasterId = String(examMasterId).toUpperCase();
     if (examCategoryId) filter.examCategoryId = String(examCategoryId).toUpperCase();
     if (subjectId) filter.subjectId = String(subjectId).toUpperCase();
+    if (String(examStage || "").trim()) filter.examStage = String(examStage).trim().toUpperCase();
 
     const safePage = Math.max(parseInt(page, 10) || 1, 1);
     const safeLimit = Math.max(parseInt(limit, 10) || 10, 1);

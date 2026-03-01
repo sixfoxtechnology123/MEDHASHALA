@@ -24,9 +24,9 @@ const resolveCategory = async (catInput, examCode) => {
   const categoryByCode = await Category.findOne({
     catId: String(catInput).trim().toUpperCase(),
     examCode: String(examCode || "").trim().toUpperCase(),
-  }).select("catName catId examCode");
+  }).select("catName catId examCode examStage");
   if (categoryByCode) return categoryByCode;
-  return Category.findById(catInput).select("catName catId examCode");
+  return Category.findById(catInput).select("catName catId examCode examStage");
 };
 
 const resolveSubject = async (subjectInput, examCode, catId) => {
@@ -72,6 +72,7 @@ const buildHierarchyPayload = async ({ examMasterId, examCategoryId, subjectId }
     subjectId: String(selectedSubject.syllabusId || "").toUpperCase(),
     examName: selectedExam.examName,
     examCode: selectedExam.examCode,
+    examStage: String(selectedCategory.examStage || "").trim().toUpperCase() || undefined,
     categoryName: selectedCategory.catName,
     categoryCode: selectedCategory.catId,
     subjectName: selectedSubject.subjectName,
@@ -107,11 +108,12 @@ exports.getNextQuestionBankId = async (req, res) => {
 
 exports.getQuestionBank = async (req, res) => {
   try {
-    const { examMasterId, examCategoryId, subjectId, status, page = 1, limit = 10, search = "" } = req.query;
+    const { examMasterId, examCategoryId, subjectId, examStage, status, page = 1, limit = 10, search = "" } = req.query;
     const filter = {};
     if (examMasterId) filter.examMasterId = String(examMasterId).toUpperCase();
     if (examCategoryId) filter.examCategoryId = String(examCategoryId).toUpperCase();
     if (subjectId) filter.subjectId = String(subjectId).toUpperCase();
+    if (String(examStage || "").trim()) filter.examStage = String(examStage).trim().toUpperCase();
     if (String(status || "").toUpperCase() === "ACTIVE") filter.status = "ACTIVE";
     if (String(status || "").toUpperCase() === "INACTIVE") filter.status = "INACTIVE";
 
