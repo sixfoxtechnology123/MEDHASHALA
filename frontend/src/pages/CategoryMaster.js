@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { 
-  Layers, Hash, Save, CheckSquare, Square, 
+import {
+  Layers, Hash, Save, CheckSquare, Square,
   Loader2, Edit, Trash2, Search, Plus, X, RefreshCw
 } from "lucide-react";
 import axios from "../api/axios";
@@ -18,7 +18,8 @@ const CategoryMaster = () => {
   const [formData, setFormData] = useState({ 
     catId: "", 
     examId: "", 
-    examStage: "",
+    examStages: [],
+    examStageInput: "",
     catName: "", 
     features: [],
     status: "ACTIVE",
@@ -66,7 +67,7 @@ const CategoryMaster = () => {
 
   const openAddForm = () => {
     setEditId(null);
-    setFormData({ catId: "", examId: "", examStage: "", catName: "", features: [], status: "ACTIVE" });
+    setFormData({ catId: "", examId: "", examStages: [], examStageInput: "", catName: "", features: [], status: "ACTIVE" });
     fetchData();
     setIsFormOpen(true);
   };
@@ -80,15 +81,48 @@ const CategoryMaster = () => {
     );
 
     setEditId(cat._id);
+    const stages = Array.from(
+      new Set(
+        [ ...(Array.isArray(cat.examStages) ? cat.examStages : []), cat.examStage ]
+          .map((s) => String(s || "").trim().toUpperCase())
+          .filter(Boolean)
+      )
+    );
     setFormData({
       catId: cat.catId,
       examId: matchedExam?._id || "",
-      examStage: cat.examStage || "",
+      examStages: stages,
+      examStageInput: "",
       catName: cat.catName,
       features: cat.features || [],
       status: cat.status || "ACTIVE",
     });
     setIsFormOpen(true);
+  };
+
+  const addExamStage = () => {
+    const value = String(formData.examStageInput || "").trim().toUpperCase();
+    if (!value) return;
+    setFormData((prev) => ({
+      ...prev,
+      examStages: prev.examStages.includes(value) ? prev.examStages : [...prev.examStages, value],
+      examStageInput: "",
+    }));
+  };
+
+  const updateExamStage = (idx, value) => {
+    const clean = String(value || "").toUpperCase();
+    setFormData((prev) => ({
+      ...prev,
+      examStages: prev.examStages.map((s, i) => (i === idx ? clean : s)),
+    }));
+  };
+
+  const removeExamStage = (idx) => {
+    setFormData((prev) => ({
+      ...prev,
+      examStages: prev.examStages.filter((_, i) => i !== idx),
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -104,7 +138,7 @@ const CategoryMaster = () => {
 
     setIsSaving(true);
     try {
-      const payload = { ...formData, id: editId };
+      const payload = { ...formData, id: editId, examStages: formData.examStages.filter(Boolean) };
 
       const res = await axios.post("/master/category/upsert", payload);
       if (res.data.success) {
@@ -132,7 +166,7 @@ const CategoryMaster = () => {
     c.catName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (c.examName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
     (c.examCode || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (c.examStage || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (Array.isArray(c.examStages) ? c.examStages.join(" ") : c.examStage || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
     (c.status || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -214,7 +248,7 @@ const CategoryMaster = () => {
                  
                   <td className="p-2 font-black text-slate-800 text-[11px] uppercase">{cat.catName}</td>
                    <td className="p-2 text-[11px] font-semibold text-slate-700">
-                    {cat.examStage || "---"}
+                    {(Array.isArray(cat.examStages) ? cat.examStages : [cat.examStage]).filter(Boolean).join(", ") || "---"}
                   </td>
                   <td className="p-2">
                     <div className="flex flex-wrap gap-1">
@@ -256,7 +290,7 @@ const CategoryMaster = () => {
           
           <form 
             onSubmit={handleSubmit}
-            className="relative bg-white w-full max-w-xl p-8 rounded-[40px] shadow-2xl overflow-hidden"
+            className="relative bg-white w-full max-w-xl p-8 rounded-[40px] shadow-2xl max-h-[90vh] overflow-y-auto"
           >
             <div className="flex justify-between items-center mb-6">
               <div>
@@ -279,7 +313,6 @@ const CategoryMaster = () => {
                 <div>
                   <label className="text-sm font-semibold text-slate-900 mb-1 block">Parent Exam</label>
                   <select 
-                    required
                     className="w-full p-3 bg-white border border-slate-200 rounded-xl font-semibold text-[11px] outline-none focus:border-blue-600"
                     value={formData.examId}
                     onChange={(e) => setFormData({...formData, examId: e.target.value})}
@@ -299,7 +332,6 @@ const CategoryMaster = () => {
               <div>
                 <label className="text-sm font-semibold text-slate-900 mb-1 block">Category Name</label>
                 <input 
-                  required
                   type="text"
                   className="w-full p-3 border border-slate-200 rounded-xl font-semibold text-[11px] outline-none focus:border-blue-600"
                   value={formData.catName}
@@ -310,13 +342,39 @@ const CategoryMaster = () => {
                 <label className="text-sm font-semibold text-slate-900 mb-1 block">
                   Exam Stage (Optional)
                 </label>
-                <input
-                  type="text"
-                  placeholder="e.g. PRE, MAINS, PHASE-1"
-                  className="w-full p-3 border border-slate-200 rounded-xl font-semibold text-[11px] outline-none focus:border-blue-600"
-                  value={formData.examStage}
-                  onChange={(e) => setFormData({ ...formData, examStage: e.target.value.toUpperCase() })}
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="e.g. PRE, MAINS, PHASE-1"
+                    className="w-full p-3 border border-slate-200 rounded-xl font-semibold text-[11px] outline-none focus:border-blue-600"
+                    value={formData.examStageInput}
+                    onChange={(e) => setFormData({ ...formData, examStageInput: e.target.value.toUpperCase() })}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addExamStage();
+                      }
+                    }}
+                  />
+                  <button type="button" onClick={addExamStage} className="p-3 rounded-xl bg-slate-900 text-white hover:bg-blue-600">
+                    <Plus size={14} />
+                  </button>
+                </div>
+                <div className="mt-2 space-y-2">
+                  {(formData.examStages || []).map((stage, idx) => (
+                    <div key={`stage-${idx}`} className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={stage}
+                        onChange={(e) => updateExamStage(idx, e.target.value)}
+                        className="w-full p-2 border border-slate-200 rounded-lg font-semibold text-[11px] outline-none focus:border-blue-600"
+                      />
+                      <button type="button" onClick={() => removeExamStage(idx)} className="p-2 rounded-lg bg-red-50 text-red-500 hover:bg-red-100">
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
               <div>
                 <label className="text-sm font-semibold text-slate-900 mb-3 block">Features</label>

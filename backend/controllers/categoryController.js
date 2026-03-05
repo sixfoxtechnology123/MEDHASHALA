@@ -25,7 +25,7 @@ exports.getNextCategoryId = async (req, res) => {
 
 exports.upsertCategory = async (req, res) => {
   try {
-    const { id, catId, examId, catName, examStage, features = [], status = "ACTIVE" } = req.body;
+    const { id, catId, examId, catName, examStage, examStages = [], features = [], status = "ACTIVE" } = req.body;
 
     if (!examId || !mongoose.isValidObjectId(examId)) {
       return res.status(400).json({ success: false, message: "VALID EXAM REQUIRED" });
@@ -40,13 +40,22 @@ exports.upsertCategory = async (req, res) => {
       return res.status(404).json({ success: false, message: "EXAM NOT FOUND" });
     }
 
+    const normalizedStages = Array.from(
+      new Set(
+        (Array.isArray(examStages) ? examStages : [examStage])
+          .map((s) => String(s || "").trim().toUpperCase())
+          .filter(Boolean)
+      )
+    );
+
     const categoryData = {
       catName,
       features,
       status: String(status).toUpperCase() === "INACTIVE" ? "INACTIVE" : "ACTIVE",
       examName: selectedExam.examName,
       examCode: selectedExam.examCode,
-      examStage: String(examStage || "").trim().toUpperCase() || undefined,
+      examStages: normalizedStages,
+      examStage: normalizedStages[0] || undefined,
     };
 
     if (id) {
@@ -76,9 +85,25 @@ exports.upsertCategory = async (req, res) => {
 // 3. GET ALL (With Populated Exam Names)
 exports.getAllCategories = async (req, res) => {
   try {
-    const categories = await Category.find()
-      .sort({ createdAt: 1 });
-    res.json({ success: true, data: categories });
+    const categories = await Category.find().sort({ createdAt: 1 }).lean();
+    const normalized = categories.map((row) => {
+      const stages = Array.from(
+        new Set(
+          [
+            ...(Array.isArray(row.examStages) ? row.examStages : []),
+            String(row.examStage || "").trim(),
+          ]
+            .map((s) => String(s || "").trim().toUpperCase())
+            .filter(Boolean)
+        )
+      );
+      return {
+        ...row,
+        examStages: stages,
+        examStage: stages[0] || "",
+      };
+    });
+    res.json({ success: true, data: normalized });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

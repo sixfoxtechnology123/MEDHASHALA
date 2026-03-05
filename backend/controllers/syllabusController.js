@@ -68,6 +68,7 @@ exports.upsertSyllabus = async (req, res) => {
       syllabusId,
       examId,
       categoryId,
+      examStage,
       subjectName,
       topics = [],
       status = "ACTIVE",
@@ -75,9 +76,6 @@ exports.upsertSyllabus = async (req, res) => {
 
     if (!examId || !mongoose.isValidObjectId(examId)) {
       return res.status(400).json({ success: false, message: "VALID EXAM REQUIRED" });
-    }
-    if (!categoryId || !mongoose.isValidObjectId(categoryId)) {
-      return res.status(400).json({ success: false, message: "VALID CATEGORY REQUIRED" });
     }
     if (!subjectName || !subjectName.trim()) {
       return res.status(400).json({ success: false, message: "SUBJECT NAME REQUIRED" });
@@ -101,23 +99,38 @@ exports.upsertSyllabus = async (req, res) => {
       return res.status(404).json({ success: false, message: "EXAM NOT FOUND" });
     }
 
-    const selectedCategory = await Category.findById(categoryId).select("catId catName examName examCode examStage");
-    if (!selectedCategory) {
-      return res.status(404).json({ success: false, message: "CATEGORY NOT FOUND" });
+    let selectedCategory = null;
+    if (categoryId && mongoose.isValidObjectId(categoryId)) {
+      selectedCategory = await Category.findById(categoryId).select("catId catName examName examCode examStage examStages");
+      if (!selectedCategory) {
+        return res.status(404).json({ success: false, message: "CATEGORY NOT FOUND" });
+      }
+      if (
+        String(selectedCategory.examCode || "").toUpperCase() !==
+        String(selectedExam.examCode || "").toUpperCase()
+      ) {
+        return res.status(400).json({ success: false, message: "CATEGORY DOES NOT BELONG TO EXAM" });
+      }
     }
-    if (
-      String(selectedCategory.examCode || "").toUpperCase() !==
-      String(selectedExam.examCode || "").toUpperCase()
-    ) {
-      return res.status(400).json({ success: false, message: "CATEGORY DOES NOT BELONG TO EXAM" });
+
+    const availableStages = Array.from(
+      new Set(
+        [ ...(Array.isArray(selectedCategory?.examStages) ? selectedCategory.examStages : []), selectedCategory?.examStage ]
+          .map((s) => String(s || "").trim().toUpperCase())
+          .filter(Boolean)
+      )
+    );
+    const normalizedExamStage = String(examStage || "").trim().toUpperCase();
+    if (normalizedExamStage && availableStages.length && !availableStages.includes(normalizedExamStage)) {
+      return res.status(400).json({ success: false, message: "INVALID EXAM STAGE FOR CATEGORY" });
     }
 
     const payload = {
       examName: selectedExam.examName,
       examCode: selectedExam.examCode,
-      examStage: String(selectedCategory.examStage || "").trim().toUpperCase() || undefined,
-      catId: selectedCategory.catId,
-      catName: selectedCategory.catName,
+      examStage: normalizedExamStage || availableStages[0] || undefined,
+      catId: selectedCategory?.catId || "",
+      catName: selectedCategory?.catName || "",
       subjectName: String(subjectName).trim().toUpperCase(),
       topics: cleanTopics,
       status: String(status).toUpperCase() === "INACTIVE" ? "INACTIVE" : "ACTIVE",

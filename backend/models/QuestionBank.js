@@ -13,6 +13,8 @@ const questionBankSchema = new mongoose.Schema(
     categoryName: { type: String, required: true, trim: true, uppercase: true },
     categoryCode: { type: String, required: true, trim: true, uppercase: true },
     subjectName: { type: String, required: true, trim: true, uppercase: true },
+    topicName: { type: String, trim: true, uppercase: true },
+    subTopicName: { type: String, trim: true, uppercase: true },
 
     marks: { type: Number, default: 1, min: 0 },
     negativeMarks: { type: Number, default: 0, min: 0 },

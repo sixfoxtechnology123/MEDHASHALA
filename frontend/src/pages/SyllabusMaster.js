@@ -126,7 +126,13 @@ const SyllabusMaster = () => {
 
   const stageOptionsForForm = useMemo(() => {
     const selectedCategory = categories.find((cat) => String(cat._id) === String(formData.categoryId));
-    return selectedCategory?.examStage ? [String(selectedCategory.examStage).toUpperCase()] : [];
+    return Array.from(
+      new Set(
+        [ ...(Array.isArray(selectedCategory?.examStages) ? selectedCategory.examStages : []), selectedCategory?.examStage ]
+          .map((stage) => String(stage || "").trim().toUpperCase())
+          .filter(Boolean)
+      )
+    );
   }, [categories, formData.categoryId]);
 
   const stageOptionsForList = useMemo(() => {
@@ -136,7 +142,13 @@ const SyllabusMaster = () => {
         String(cat.examCode || "").toUpperCase() === String(listFilters.examCode || "").toUpperCase() &&
         String(cat.catId || "").toUpperCase() === String(listFilters.catId || "").toUpperCase()
     );
-    return selectedCategory?.examStage ? [String(selectedCategory.examStage).toUpperCase()] : [];
+    return Array.from(
+      new Set(
+        [ ...(Array.isArray(selectedCategory?.examStages) ? selectedCategory.examStages : []), selectedCategory?.examStage ]
+          .map((stage) => String(stage || "").trim().toUpperCase())
+          .filter(Boolean)
+      )
+    );
   }, [categories, listFilters.examCode, listFilters.catId]);
 
   const hasExamStageInList = useMemo(
@@ -252,7 +264,6 @@ const SyllabusMaster = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.examId) return toast.error("PLEASE SELECT EXAM");
-    if (!formData.categoryId) return toast.error("PLEASE SELECT CATEGORY");
     if (!formData.subjectName.trim()) return toast.error("PLEASE ENTER SUBJECT NAME");
 
     if (formData.topics.length === 0) return toast.error("PLEASE SAVE AT LEAST ONE TOPIC");
@@ -263,7 +274,8 @@ const SyllabusMaster = () => {
         id: editId,
         syllabusId: formData.syllabusId,
         examId: formData.examId,
-        categoryId: formData.categoryId,
+        examStage: formData.examStage || undefined,
+        categoryId: formData.categoryId || undefined,
         subjectName: formData.subjectName.toUpperCase(),
         topics: formData.topics,
         status: formData.status,
@@ -365,7 +377,7 @@ const SyllabusMaster = () => {
               setListFilters((prev) => ({
                 ...prev,
                 catId: e.target.value,
-                examStage: selectedCategory?.examStage || "",
+                examStage: "",
               }));
             }}
             className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-semibold text-[11px] outline-none focus:border-blue-600"
@@ -402,8 +414,9 @@ const SyllabusMaster = () => {
               <tr className="bg-[#0F172A] text-white text-[10px] font-black uppercase tracking-widest">
                 <th className="p-2">ID</th>
                 <th className="p-2">Exam</th>
-                {hasExamStageInList && <th className="p-2">Stage</th>}
+                
                 <th className="p-2">Category</th>
+                {hasExamStageInList && <th className="p-2">Stage</th>}
                 <th className="p-2">Subject</th>
                 <th className="p-2">Topics</th>
                 <th className="p-2">Status</th>
@@ -422,10 +435,11 @@ const SyllabusMaster = () => {
                   <tr key={row._id} className="hover:bg-blue-50/30 transition-all align-top">
                     <td className="p-2 font-black text-blue-600 text-[12px]">{row.syllabusId}</td>
                     <td className="p-2 font-black text-slate-900 text-[11px] uppercase">{row.examName}</td>
-                    {hasExamStageInList && (
+                   
+                    <td className="p-2 font-black text-slate-800 text-[11px] uppercase">{row.catName || "---"}</td>
+                     {hasExamStageInList && (
                       <td className="p-2 text-slate-700 text-[11px] font-semibold">{row.examStage || "---"}</td>
                     )}
-                    <td className="p-2 font-black text-slate-800 text-[11px] uppercase">{row.catName}</td>
                     <td className="p-2 font-black text-slate-800 text-[11px] uppercase">{row.subjectName}</td>
                     <td className="p-2">
                       <div className="space-y-1">
@@ -534,7 +548,6 @@ const SyllabusMaster = () => {
                 <div>
                   <label className="text-[11px] font-semibold text-slate-900 mb-1 block">Exam Name</label>
                   <select
-                    required
                     value={formData.examId}
                     onChange={(e) =>
                       setFormData({ ...formData, examId: e.target.value, examStage: "", categoryId: "" })
@@ -555,19 +568,19 @@ const SyllabusMaster = () => {
                     Category Name
                   </label>
                   <select
-                    required
                     value={formData.categoryId}
                     onChange={(e) => {
                       const selectedCategory = categories.find((cat) => String(cat._id) === String(e.target.value));
                       setFormData({
                         ...formData,
                         categoryId: e.target.value,
-                        examStage: selectedCategory?.examStage || "",
+                        examStage: "",
                       });
                     }}
                     className="w-full p-3 bg-white border border-slate-200 rounded-xl font-semibold text-[11px] outline-none focus:border-blue-600"
                   >
                     <option value="">-- SELECT CATEGORY --</option>
+                    <option value="">NO CATEGORY</option>
                     {filteredCategories.map((cat) => (
                       <option key={cat._id} value={cat._id}>
                         {cat.catName}
@@ -600,7 +613,6 @@ const SyllabusMaster = () => {
               <div>
                 <label className="text-[11px] font-semibold text-slate-900 mb-1 block">Subject Name</label>
                 <input
-                  required
                   type="text"
                   value={formData.subjectName}
                   onChange={(e) =>

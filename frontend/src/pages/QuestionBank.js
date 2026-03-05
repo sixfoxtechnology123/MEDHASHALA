@@ -25,6 +25,11 @@ const nextBankId = (currentId) => {
   return `QSBANK${(Number.isNaN(n) ? 0 : n) + 1}`;
 };
 
+const isNoCategoryValue = (value) => {
+  const v = String(value || "").trim().toUpperCase();
+  return !v || v === "NO CATEGORY" || v === "NO_CATEGORY" || v === "NONE";
+};
+
 const QuestionBank = () => {
   const [exams, setExams] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -33,11 +38,11 @@ const QuestionBank = () => {
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filters, setFilters] = useState({ examMasterId: "", examCategoryId: "", examStage: "", subjectId: "", status: "" });
+  const [filters, setFilters] = useState({ examMasterId: "", examCategoryId: "", examStage: "", subjectId: "", topicName: "", subTopicName: "", status: "" });
   const [pagination, setPagination] = useState({ page: 1, limit: 10, totalPages: 1, total: 0 });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editId, setEditId] = useState("");
-  const [baseForm, setBaseForm] = useState({ examMasterId: "", examCategoryId: "", examStage: "", subjectId: "" });
+  const [baseForm, setBaseForm] = useState({ examMasterId: "", examCategoryId: "", examStage: "", subjectId: "", topicName: "", subTopicName: "" });
   const [questionForm, setQuestionForm] = useState({ ...emptyQuestion });
   const [draftQuestions, setDraftQuestions] = useState([]);
 
@@ -45,31 +50,45 @@ const QuestionBank = () => {
     if (!filters.examMasterId) return [];
     return categories.filter((cat) => String(cat.examCode || "").toUpperCase() === String(filters.examMasterId || "").toUpperCase());
   }, [categories, filters.examMasterId]);
+  const filterNeedsCategory = useMemo(() => filteredCategories.length > 0, [filteredCategories]);
 
   const filteredSubjects = useMemo(() => {
-    if (!filters.examMasterId || !filters.examCategoryId) return [];
+    if (!filters.examMasterId) return [];
+    const needsCategory = categories.some((cat) => String(cat.examCode || "").toUpperCase() === String(filters.examMasterId || "").toUpperCase());
+    if (needsCategory && !filters.examCategoryId) return [];
     return subjects.filter(
       (s) =>
         String(s.examCode || "").toUpperCase() === String(filters.examMasterId || "").toUpperCase() &&
-        String(s.catId || "").toUpperCase() === String(filters.examCategoryId || "").toUpperCase() &&
+        (
+          !needsCategory
+            ? isNoCategoryValue(s.catId)
+            : String(s.catId || "").toUpperCase() === String(filters.examCategoryId || "").toUpperCase()
+        ) &&
         (!filters.examStage || String(s.examStage || "").toUpperCase() === String(filters.examStage || "").toUpperCase())
     );
-  }, [subjects, filters.examMasterId, filters.examCategoryId, filters.examStage]);
+  }, [categories, subjects, filters.examMasterId, filters.examCategoryId, filters.examStage]);
 
   const modalFilteredCategories = useMemo(() => {
     if (!baseForm.examMasterId) return [];
     return categories.filter((cat) => String(cat.examCode || "").toUpperCase() === String(baseForm.examMasterId || "").toUpperCase());
   }, [categories, baseForm.examMasterId]);
+  const modalNeedsCategory = useMemo(() => modalFilteredCategories.length > 0, [modalFilteredCategories]);
 
   const modalFilteredSubjects = useMemo(() => {
-    if (!baseForm.examMasterId || !baseForm.examCategoryId) return [];
+    if (!baseForm.examMasterId) return [];
+    const needsCategory = categories.some((cat) => String(cat.examCode || "").toUpperCase() === String(baseForm.examMasterId || "").toUpperCase());
+    if (needsCategory && !baseForm.examCategoryId) return [];
     return subjects.filter(
       (s) =>
         String(s.examCode || "").toUpperCase() === String(baseForm.examMasterId || "").toUpperCase() &&
-        String(s.catId || "").toUpperCase() === String(baseForm.examCategoryId || "").toUpperCase() &&
+        (
+          !needsCategory
+            ? isNoCategoryValue(s.catId)
+            : String(s.catId || "").toUpperCase() === String(baseForm.examCategoryId || "").toUpperCase()
+        ) &&
         (!baseForm.examStage || String(s.examStage || "").toUpperCase() === String(baseForm.examStage || "").toUpperCase())
     );
-  }, [subjects, baseForm.examMasterId, baseForm.examCategoryId, baseForm.examStage]);
+  }, [categories, subjects, baseForm.examMasterId, baseForm.examCategoryId, baseForm.examStage]);
 
   const filterStageOptions = useMemo(() => {
     if (!filters.examMasterId || !filters.examCategoryId) return [];
@@ -78,7 +97,13 @@ const QuestionBank = () => {
         String(cat.examCode || "").toUpperCase() === String(filters.examMasterId || "").toUpperCase() &&
         String(cat.catId || "").toUpperCase() === String(filters.examCategoryId || "").toUpperCase()
     );
-    return selectedCategory?.examStage ? [String(selectedCategory.examStage).toUpperCase()] : [];
+    return Array.from(
+      new Set(
+        [ ...(Array.isArray(selectedCategory?.examStages) ? selectedCategory.examStages : []), selectedCategory?.examStage ]
+          .map((s) => String(s || "").trim().toUpperCase())
+          .filter(Boolean)
+      )
+    );
   }, [categories, filters.examMasterId, filters.examCategoryId]);
 
   const modalStageOptions = useMemo(() => {
@@ -88,13 +113,59 @@ const QuestionBank = () => {
         String(cat.examCode || "").toUpperCase() === String(baseForm.examMasterId || "").toUpperCase() &&
         String(cat.catId || "").toUpperCase() === String(baseForm.examCategoryId || "").toUpperCase()
     );
-    return selectedCategory?.examStage ? [String(selectedCategory.examStage).toUpperCase()] : [];
+    return Array.from(
+      new Set(
+        [ ...(Array.isArray(selectedCategory?.examStages) ? selectedCategory.examStages : []), selectedCategory?.examStage ]
+          .map((s) => String(s || "").trim().toUpperCase())
+          .filter(Boolean)
+      )
+    );
   }, [categories, baseForm.examMasterId, baseForm.examCategoryId]);
+  const filterNeedsStage = useMemo(() => filterNeedsCategory && filterStageOptions.length > 0, [filterNeedsCategory, filterStageOptions]);
+  const modalNeedsStage = useMemo(() => modalNeedsCategory && modalStageOptions.length > 0, [modalNeedsCategory, modalStageOptions]);
 
   const hasStageInRows = useMemo(
     () => rows.some((row) => String(row.examStage || "").trim()),
     [rows]
   );
+  const hasTopicInRows = useMemo(
+    () => rows.some((row) => String(row.topicName || "").trim() || String(row.subTopicName || "").trim()),
+    [rows]
+  );
+
+  const filterTopicOptions = useMemo(() => {
+    const selectedSubject = subjects.find(
+      (s) => String(s.syllabusId || "").toUpperCase() === String(filters.subjectId || "").toUpperCase()
+    );
+    return (selectedSubject?.topics || []).map((t) => String(t.topicName || "").toUpperCase()).filter(Boolean);
+  }, [subjects, filters.subjectId]);
+
+  const filterSubTopicOptions = useMemo(() => {
+    const selectedSubject = subjects.find(
+      (s) => String(s.syllabusId || "").toUpperCase() === String(filters.subjectId || "").toUpperCase()
+    );
+    const selectedTopic = (selectedSubject?.topics || []).find(
+      (t) => String(t.topicName || "").toUpperCase() === String(filters.topicName || "").toUpperCase()
+    );
+    return (selectedTopic?.subTopics || []).map((s) => String(s || "").toUpperCase()).filter(Boolean);
+  }, [subjects, filters.subjectId, filters.topicName]);
+
+  const modalTopicOptions = useMemo(() => {
+    const selectedSubject = subjects.find(
+      (s) => String(s.syllabusId || "").toUpperCase() === String(baseForm.subjectId || "").toUpperCase()
+    );
+    return (selectedSubject?.topics || []).map((t) => String(t.topicName || "").toUpperCase()).filter(Boolean);
+  }, [subjects, baseForm.subjectId]);
+
+  const modalSubTopicOptions = useMemo(() => {
+    const selectedSubject = subjects.find(
+      (s) => String(s.syllabusId || "").toUpperCase() === String(baseForm.subjectId || "").toUpperCase()
+    );
+    const selectedTopic = (selectedSubject?.topics || []).find(
+      (t) => String(t.topicName || "").toUpperCase() === String(baseForm.topicName || "").toUpperCase()
+    );
+    return (selectedTopic?.subTopics || []).map((s) => String(s || "").toUpperCase()).filter(Boolean);
+  }, [subjects, baseForm.subjectId, baseForm.topicName]);
 
   const fetchMasters = async () => {
     const [examRes, catRes, subRes] = await Promise.allSettled([
@@ -115,6 +186,8 @@ const QuestionBank = () => {
       if (filters.examCategoryId) params.set("examCategoryId", filters.examCategoryId);
       if (filters.examStage) params.set("examStage", filters.examStage);
       if (filters.subjectId) params.set("subjectId", filters.subjectId);
+      if (filters.topicName) params.set("topicName", filters.topicName);
+      if (filters.subTopicName) params.set("subTopicName", filters.subTopicName);
       if (filters.status) params.set("status", filters.status);
       if (searchTerm.trim()) params.set("search", searchTerm.trim());
       params.set("page", String(pagination.page));
@@ -135,7 +208,7 @@ const QuestionBank = () => {
   useEffect(() => {
     fetchRows();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.examMasterId, filters.examCategoryId, filters.examStage, filters.subjectId, filters.status, pagination.page, pagination.limit]);
+  }, [filters.examMasterId, filters.examCategoryId, filters.examStage, filters.subjectId, filters.topicName, filters.subTopicName, filters.status, pagination.page, pagination.limit]);
 
   const handleSearch = () => {
     setPagination((prev) => ({ ...prev, page: 1 }));
@@ -147,7 +220,7 @@ const QuestionBank = () => {
       const idRes = await axios.get("/master/question-bank/next-id");
       setEditId("");
       setDraftQuestions([]);
-      setBaseForm({ examMasterId: "", examCategoryId: "", examStage: "", subjectId: "" });
+      setBaseForm({ examMasterId: "", examCategoryId: "", examStage: "", subjectId: "", topicName: "", subTopicName: "" });
       setQuestionForm({ ...emptyQuestion, questionBankId: idRes.data?.nextId || "QSBANK1" });
       setIsModalOpen(true);
     } catch {
@@ -158,7 +231,7 @@ const QuestionBank = () => {
   const handleEdit = (row) => {
     setEditId(row._id);
     setDraftQuestions([]);
-    setBaseForm({ examMasterId: row.examMasterId || "", examCategoryId: row.examCategoryId || "", examStage: row.examStage || "", subjectId: row.subjectId || "" });
+    setBaseForm({ examMasterId: row.examMasterId || "", examCategoryId: row.examCategoryId || "", examStage: row.examStage || "", subjectId: row.subjectId || "", topicName: row.topicName || "", subTopicName: row.subTopicName || "" });
     setQuestionForm({
       questionBankId: row.questionBankId || "",
       marks: Number(row.marks ?? 1),
@@ -182,7 +255,8 @@ const QuestionBank = () => {
   };
 
   const addDraftQuestion = () => {
-    if (!baseForm.examMasterId || !baseForm.examCategoryId || !baseForm.subjectId) return toastErrorOnce("SELECT EXAM, CATEGORY, SUBJECT");
+    if (!baseForm.examMasterId || !baseForm.subjectId) return toastErrorOnce("SELECT EXAM, SUBJECT");
+    if (modalNeedsCategory && !baseForm.examCategoryId) return toastErrorOnce("SELECT CATEGORY");
     const err = validateQuestion(questionForm);
     if (err) return toastErrorOnce(err);
     setDraftQuestions((prev) => [...prev, { ...questionForm }]);
@@ -210,7 +284,8 @@ const QuestionBank = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isSaving) return;
-    if (!baseForm.examMasterId || !baseForm.examCategoryId || !baseForm.subjectId) return toastErrorOnce("SELECT EXAM, CATEGORY, SUBJECT");
+    if (!baseForm.examMasterId || !baseForm.subjectId) return toastErrorOnce("SELECT EXAM, SUBJECT");
+    if (modalNeedsCategory && !baseForm.examCategoryId) return toastErrorOnce("SELECT CATEGORY");
 
     if (editId) {
       const err = validateQuestion(questionForm);
@@ -255,24 +330,32 @@ const QuestionBank = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
-            <select value={filters.examMasterId} onChange={(e) => { setFilters((prev) => ({ ...prev, examMasterId: e.target.value, examCategoryId: "", examStage: "", subjectId: "" })); setPagination((prev) => ({ ...prev, page: 1 })); }} className="w-full p-2 border border-slate-200 rounded-xl text-sm font-normal">
+          <div className="grid grid-cols-1 md:grid-cols-8 gap-3">
+            <select value={filters.examMasterId} onChange={(e) => { setFilters((prev) => ({ ...prev, examMasterId: e.target.value, examCategoryId: "", examStage: "", subjectId: "", topicName: "", subTopicName: "" })); setPagination((prev) => ({ ...prev, page: 1 })); }} className="w-full p-2 border border-slate-200 rounded-xl text-sm font-normal">
               <option value="">All Exams</option>
               {exams.map((ex) => <option key={ex.examCode} value={ex.examCode}>{ex.examName}</option>)}
             </select>
-            <select value={filters.examCategoryId} onChange={(e) => { const categoryId = e.target.value; const selectedCategory = categories.find((cat) => String(cat.examCode || "").toUpperCase() === String(filters.examMasterId || "").toUpperCase() && String(cat.catId || "").toUpperCase() === String(categoryId || "").toUpperCase()); setFilters((prev) => ({ ...prev, examCategoryId: categoryId, examStage: selectedCategory?.examStage || "", subjectId: "" })); setPagination((prev) => ({ ...prev, page: 1 })); }} className="w-full p-2 border border-slate-200 rounded-xl text-sm font-normal">
+            {filterNeedsCategory && <select value={filters.examCategoryId} onChange={(e) => { const categoryId = e.target.value; setFilters((prev) => ({ ...prev, examCategoryId: categoryId, examStage: "", subjectId: "", topicName: "", subTopicName: "" })); setPagination((prev) => ({ ...prev, page: 1 })); }} className="w-full p-2 border border-slate-200 rounded-xl text-sm font-normal">
               <option value="">All Categories</option>
               {filteredCategories.map((cat) => <option key={cat.catId} value={cat.catId}>{cat.catName}</option>)}
-            </select>
-            {filterStageOptions.length > 0 && (
-              <select value={filters.examStage} onChange={(e) => { setFilters((prev) => ({ ...prev, examStage: e.target.value, subjectId: "" })); setPagination((prev) => ({ ...prev, page: 1 })); }} className="w-full p-2 border border-slate-200 rounded-xl text-sm font-normal">
+            </select>}
+            {filterNeedsStage && (
+              <select value={filters.examStage} onChange={(e) => { setFilters((prev) => ({ ...prev, examStage: e.target.value, subjectId: "", topicName: "", subTopicName: "" })); setPagination((prev) => ({ ...prev, page: 1 })); }} className="w-full p-2 border border-slate-200 rounded-xl text-sm font-normal">
                 <option value="">All Stages</option>
                 {filterStageOptions.map((stage) => <option key={stage} value={stage}>{stage}</option>)}
               </select>
             )}
-            <select value={filters.subjectId} onChange={(e) => { setFilters((prev) => ({ ...prev, subjectId: e.target.value })); setPagination((prev) => ({ ...prev, page: 1 })); }} className="w-full p-2 border border-slate-200 rounded-xl text-sm font-normal">
+            <select value={filters.subjectId} onChange={(e) => { setFilters((prev) => ({ ...prev, subjectId: e.target.value, topicName: "", subTopicName: "" })); setPagination((prev) => ({ ...prev, page: 1 })); }} className="w-full p-2 border border-slate-200 rounded-xl text-sm font-normal">
               <option value="">All Subjects</option>
               {filteredSubjects.map((sub) => <option key={sub.syllabusId} value={sub.syllabusId}>{sub.subjectName}</option>)}
+            </select>
+            <select value={filters.topicName} onChange={(e) => { setFilters((prev) => ({ ...prev, topicName: e.target.value, subTopicName: "" })); setPagination((prev) => ({ ...prev, page: 1 })); }} className="w-full p-2 border border-slate-200 rounded-xl text-sm font-normal">
+              <option value="">All Topics</option>
+              {filterTopicOptions.map((topic) => <option key={topic} value={topic}>{topic}</option>)}
+            </select>
+            <select value={filters.subTopicName} onChange={(e) => { setFilters((prev) => ({ ...prev, subTopicName: e.target.value })); setPagination((prev) => ({ ...prev, page: 1 })); }} className="w-full p-2 border border-slate-200 rounded-xl text-sm font-normal">
+              <option value="">All SubTopics</option>
+              {filterSubTopicOptions.map((sub) => <option key={sub} value={sub}>{sub}</option>)}
             </select>
             <select value={filters.status} onChange={(e) => { setFilters((prev) => ({ ...prev, status: e.target.value })); setPagination((prev) => ({ ...prev, page: 1 })); }} className="w-full p-2 border border-slate-200 rounded-xl text-sm font-normal">
               <option value="">All Status</option>
@@ -295,14 +378,14 @@ const QuestionBank = () => {
       <section className="bg-white rounded-[10px] border border-slate-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
-            <thead><tr className="bg-[#0F172A] text-white text-[11px] font-semibold"><th className="p-2">Q.ID</th><th className="p-2">Exam</th>{hasStageInRows && <th className="p-2">Stage</th>}<th className="p-2">Category</th><th className="p-2">Subject</th><th className="p-2">Marks</th><th className="p-2">Negative</th><th className="p-2">Status</th><th className="p-2 text-center">Actions</th></tr></thead>
-            <tbody className="divide-y divide-slate-50">
-              {loading ? <tr><td colSpan={hasStageInRows ? 9 : 8} className="p-20 text-center text-slate-300 font-semibold">Loading...</td></tr> : rows.length > 0 ? rows.map((row) => (
+            <thead><tr className="bg-[#0F172A] text-white text-[11px] font-semibold"><th className="p-2">Q.ID</th><th className="p-2">Exam</th>{hasStageInRows && <th className="p-2">Stage</th>}<th className="p-2">Category</th><th className="p-2">Subject</th>{hasTopicInRows && <th className="p-2">Topic</th>}{hasTopicInRows && <th className="p-2">SubTopic</th>}<th className="p-2">Marks</th><th className="p-2">Negative</th><th className="p-2">Status</th><th className="p-2 text-center">Actions</th></tr></thead>
+              <tbody className="divide-y divide-slate-50">
+              {loading ? <tr><td colSpan={(hasStageInRows ? 1 : 0) + (hasTopicInRows ? 2 : 0) + 8} className="p-20 text-center text-slate-300 font-semibold">Loading...</td></tr> : rows.length > 0 ? rows.map((row) => (
                 <tr key={row._id} className="hover:bg-blue-50/30">
-                  <td className="p-2 text-blue-600 text-sm font-semibold">{row.questionBankId}</td><td className="p-2 text-xs font-normal">{row.examName}</td>{hasStageInRows && <td className="p-2 text-xs font-normal">{row.examStage || "---"}</td>}<td className="p-2 text-xs font-normal">{row.categoryName}</td><td className="p-2 text-xs font-normal">{row.subjectName}</td><td className="p-2 text-xs font-normal">{row.marks}</td><td className="p-2 text-xs font-normal">{row.negativeMarks}</td><td className="p-2 text-xs font-normal">{row.status}</td>
+                  <td className="p-2 text-blue-600 text-sm font-semibold">{row.questionBankId}</td><td className="p-2 text-xs font-normal">{row.examName}</td>{hasStageInRows && <td className="p-2 text-xs font-normal">{row.examStage || "---"}</td>}<td className="p-2 text-xs font-normal">{row.categoryName}</td><td className="p-2 text-xs font-normal">{row.subjectName}</td>{hasTopicInRows && <td className="p-2 text-xs font-normal">{row.topicName || "---"}</td>}{hasTopicInRows && <td className="p-2 text-xs font-normal">{row.subTopicName || "---"}</td>}<td className="p-2 text-xs font-normal">{row.marks}</td><td className="p-2 text-xs font-normal">{row.negativeMarks}</td><td className="p-2 text-xs font-normal">{row.status}</td>
                   <td className="p-2 flex justify-center gap-2"><button onClick={() => handleEdit(row)} className="p-2 bg-blue-50 text-blue-600 rounded-xl"><Edit size={16} /></button><button onClick={() => handleDelete(row._id)} className="p-2 bg-red-50 text-red-400 rounded-xl"><Trash2 size={16} /></button></td>
                 </tr>
-              )) : <tr><td colSpan={hasStageInRows ? 9 : 8} className="p-20 text-center text-slate-300 font-semibold">No Records</td></tr>}
+              )) : <tr><td colSpan={(hasStageInRows ? 1 : 0) + (hasTopicInRows ? 2 : 0) + 8} className="p-20 text-center text-slate-300 font-semibold">No Records</td></tr>}
             </tbody>
           </table>
         </div>
@@ -314,10 +397,12 @@ const QuestionBank = () => {
           <form onSubmit={handleSubmit} className="relative bg-white w-full max-w-6xl p-8 rounded-[30px] shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6"><h2 className="text-xl font-semibold">{editId ? "Update Question" : "Add Multiple Questions"}</h2><button type="button" onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full"><X size={20} /></button></div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div><label className="text-sm font-normal block mb-1">Exam</label><select required value={baseForm.examMasterId} onChange={(e) => setBaseForm({ ...baseForm, examMasterId: e.target.value, examCategoryId: "", examStage: "", subjectId: "" })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-normal"><option value="">-- Select Exam --</option>{exams.map((ex) => <option key={ex.examCode} value={ex.examCode}>{ex.examName}</option>)}</select></div>
-              <div><label className="text-sm font-normal block mb-1">Category</label><select required value={baseForm.examCategoryId} onChange={(e) => { const categoryId = e.target.value; const selectedCategory = categories.find((cat) => String(cat.examCode || "").toUpperCase() === String(baseForm.examMasterId || "").toUpperCase() && String(cat.catId || "").toUpperCase() === String(categoryId || "").toUpperCase()); setBaseForm({ ...baseForm, examCategoryId: categoryId, examStage: selectedCategory?.examStage || "", subjectId: "" }); }} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-normal"><option value="">-- Select Category --</option>{modalFilteredCategories.map((cat) => <option key={cat.catId} value={cat.catId}>{cat.catName}</option>)}</select></div>
-              {modalStageOptions.length > 0 && <div><label className="text-sm font-normal block mb-1">Exam Stage</label><select value={baseForm.examStage} onChange={(e) => setBaseForm({ ...baseForm, examStage: e.target.value, subjectId: "" })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-normal"><option value="">-- Select Stage --</option>{modalStageOptions.map((stage) => <option key={stage} value={stage}>{stage}</option>)}</select></div>}
-              <div><label className="text-sm font-normal block mb-1">Subject</label><select required value={baseForm.subjectId} onChange={(e) => setBaseForm({ ...baseForm, subjectId: e.target.value })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-normal"><option value="">-- Select Subject --</option>{modalFilteredSubjects.map((sub) => <option key={sub.syllabusId} value={sub.syllabusId}>{sub.subjectName}</option>)}</select></div>
+              <div><label className="text-sm font-normal block mb-1">Exam</label><select required value={baseForm.examMasterId} onChange={(e) => setBaseForm({ ...baseForm, examMasterId: e.target.value, examCategoryId: "", examStage: "", subjectId: "", topicName: "", subTopicName: "" })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-normal"><option value="">-- Select Exam --</option>{exams.map((ex) => <option key={ex.examCode} value={ex.examCode}>{ex.examName}</option>)}</select></div>
+              {modalNeedsCategory && <div><label className="text-sm font-normal block mb-1">Category</label><select required value={baseForm.examCategoryId} onChange={(e) => { const categoryId = e.target.value; setBaseForm({ ...baseForm, examCategoryId: categoryId, examStage: "", subjectId: "", topicName: "", subTopicName: "" }); }} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-normal"><option value="">-- Select Category --</option>{modalFilteredCategories.map((cat) => <option key={cat.catId} value={cat.catId}>{cat.catName}</option>)}</select></div>}
+              {modalNeedsStage && <div><label className="text-sm font-normal block mb-1">Exam Stage</label><select value={baseForm.examStage} onChange={(e) => setBaseForm({ ...baseForm, examStage: e.target.value, subjectId: "", topicName: "", subTopicName: "" })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-normal"><option value="">-- Select Stage --</option>{modalStageOptions.map((stage) => <option key={stage} value={stage}>{stage}</option>)}</select></div>}
+              <div><label className="text-sm font-normal block mb-1">Subject</label><select required value={baseForm.subjectId} onChange={(e) => setBaseForm({ ...baseForm, subjectId: e.target.value, topicName: "", subTopicName: "" })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-normal"><option value="">-- Select Subject --</option>{modalFilteredSubjects.map((sub) => <option key={sub.syllabusId} value={sub.syllabusId}>{sub.subjectName}</option>)}</select></div>
+              <div><label className="text-sm font-normal block mb-1">Topic</label><select value={baseForm.topicName} onChange={(e) => setBaseForm({ ...baseForm, topicName: e.target.value, subTopicName: "" })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-normal"><option value="">-- Select Topic --</option>{modalTopicOptions.map((topic) => <option key={topic} value={topic}>{topic}</option>)}</select></div>
+              <div><label className="text-sm font-normal block mb-1">SubTopic</label><select value={baseForm.subTopicName} onChange={(e) => setBaseForm({ ...baseForm, subTopicName: e.target.value })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-normal"><option value="">-- Select SubTopic --</option>{modalSubTopicOptions.map((sub) => <option key={sub} value={sub}>{sub}</option>)}</select></div>
             </div>
             <div className="mt-5 border border-slate-200 rounded-2xl p-4 bg-slate-50 space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

@@ -291,7 +291,6 @@ const ExamMaster = () => {
                   Exam Name
                 </label>
                 <input
-                  required
                   autoFocus
                   type="text"
                   value={formData.examName}

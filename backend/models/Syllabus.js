@@ -14,8 +14,8 @@ const syllabusSchema = new mongoose.Schema(
     examName: { type: String, required: true, trim: true, uppercase: true },
     examCode: { type: String, required: true, trim: true, uppercase: true },
     examStage: { type: String, trim: true, uppercase: true },
-    catId: { type: String, required: true, trim: true, uppercase: true },
-    catName: { type: String, required: true, trim: true, uppercase: true },
+    catId: { type: String, trim: true, uppercase: true, default: "" },
+    catName: { type: String, trim: true, uppercase: true, default: "" },
     subjectName: { type: String, required: true, trim: true, uppercase: true },
     topics: { type: [topicSchema], default: [] },
     status: {

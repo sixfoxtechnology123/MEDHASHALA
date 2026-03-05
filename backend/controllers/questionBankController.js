@@ -2,6 +2,13 @@ const QuestionBank = require("../models/QuestionBank");
 const Exam = require("../models/Exam");
 const Category = require("../models/Category");
 const Syllabus = require("../models/Syllabus");
+const NO_CATEGORY_ID = "NO_CATEGORY";
+const NO_CATEGORY_NAME = "NO CATEGORY";
+
+const isNoCategoryValue = (value) => {
+  const v = String(value || "").trim().toUpperCase();
+  return !v || v === NO_CATEGORY_ID || v === NO_CATEGORY_NAME || v === "NONE";
+};
 
 const nextQuestionBankId = async () => {
   const rows = await QuestionBank.find().select("questionBankId").lean();
@@ -24,58 +31,79 @@ const resolveCategory = async (catInput, examCode) => {
   const categoryByCode = await Category.findOne({
     catId: String(catInput).trim().toUpperCase(),
     examCode: String(examCode || "").trim().toUpperCase(),
-  }).select("catName catId examCode examStage");
+  }).select("catName catId examCode examStage examStages");
   if (categoryByCode) return categoryByCode;
-  return Category.findById(catInput).select("catName catId examCode examStage");
+  return Category.findById(catInput).select("catName catId examCode examStage examStages");
 };
 
 const resolveSubject = async (subjectInput, examCode, catId) => {
   if (!subjectInput) return null;
-  const subjectByCode = await Syllabus.findOne({
+  const baseQuery = {
     syllabusId: String(subjectInput).trim().toUpperCase(),
     examCode: String(examCode || "").trim().toUpperCase(),
-    catId: String(catId || "").trim().toUpperCase(),
-  }).select("syllabusId subjectName examCode catId");
+  };
+  if (isNoCategoryValue(catId)) {
+    baseQuery.$or = [{ catId: { $exists: false } }, { catId: null }, { catId: "" }, { catId: NO_CATEGORY_ID }, { catId: NO_CATEGORY_NAME }];
+  } else {
+    baseQuery.catId = String(catId || "").trim().toUpperCase();
+  }
+  const subjectByCode = await Syllabus.findOne(baseQuery).select("syllabusId subjectName examCode catId topics");
   if (subjectByCode) return subjectByCode;
-  return Syllabus.findById(subjectInput).select("syllabusId subjectName examCode catId");
+  return Syllabus.findById(subjectInput).select("syllabusId subjectName examCode catId topics");
 };
 
-const buildHierarchyPayload = async ({ examMasterId, examCategoryId, subjectId }) => {
+const buildHierarchyPayload = async ({ examMasterId, examCategoryId, subjectId, examStage }) => {
   const selectedExam = await resolveExam(examMasterId);
   if (!selectedExam) throw new Error("EXAM_NOT_FOUND");
 
-  const selectedCategory = await resolveCategory(examCategoryId, selectedExam.examCode);
-  if (!selectedCategory) throw new Error("CATEGORY_NOT_FOUND");
+  const wantsCategory = !isNoCategoryValue(examCategoryId);
+  const selectedCategory = wantsCategory ? await resolveCategory(examCategoryId, selectedExam.examCode) : null;
+  if (wantsCategory && !selectedCategory) throw new Error("CATEGORY_NOT_FOUND");
 
-  const selectedSubject = await resolveSubject(subjectId, selectedExam.examCode, selectedCategory.catId);
+  const selectedSubject = await resolveSubject(subjectId, selectedExam.examCode, selectedCategory?.catId);
   if (!selectedSubject) throw new Error("SUBJECT_NOT_FOUND");
 
-  if (
+  if (selectedCategory && (
     String(selectedCategory.examCode || "").toUpperCase() !==
     String(selectedExam.examCode || "").toUpperCase()
-  ) {
+  )) {
     throw new Error("CATEGORY_EXAM_MISMATCH");
   }
 
   if (
     String(selectedSubject.examCode || "").toUpperCase() !==
-      String(selectedExam.examCode || "").toUpperCase() ||
-    String(selectedSubject.catId || "").toUpperCase() !==
-      String(selectedCategory.catId || "").toUpperCase()
+      String(selectedExam.examCode || "").toUpperCase() || (
+      selectedCategory
+        ? String(selectedSubject.catId || "").toUpperCase() !== String(selectedCategory.catId || "").toUpperCase()
+        : !isNoCategoryValue(selectedSubject.catId)
+    )
   ) {
     throw new Error("SUBJECT_CATEGORY_MISMATCH");
   }
 
+  const availableStages = Array.from(
+    new Set(
+      [ ...(Array.isArray(selectedCategory?.examStages) ? selectedCategory.examStages : []), selectedCategory?.examStage ]
+        .map((s) => String(s || "").trim().toUpperCase())
+        .filter(Boolean)
+    )
+  );
+  const normalizedExamStage = String(examStage || "").trim().toUpperCase();
+  if (normalizedExamStage && availableStages.length && !availableStages.includes(normalizedExamStage)) {
+    throw new Error("CATEGORY_STAGE_MISMATCH");
+  }
+
   return {
     examMasterId: String(selectedExam.examCode || "").toUpperCase(),
-    examCategoryId: String(selectedCategory.catId || "").toUpperCase(),
+    examCategoryId: selectedCategory ? String(selectedCategory.catId || "").toUpperCase() : NO_CATEGORY_ID,
     subjectId: String(selectedSubject.syllabusId || "").toUpperCase(),
     examName: selectedExam.examName,
     examCode: selectedExam.examCode,
-    examStage: String(selectedCategory.examStage || "").trim().toUpperCase() || undefined,
-    categoryName: selectedCategory.catName,
-    categoryCode: selectedCategory.catId,
+    examStage: normalizedExamStage || availableStages[0] || undefined,
+    categoryName: selectedCategory?.catName || NO_CATEGORY_NAME,
+    categoryCode: selectedCategory?.catId || NO_CATEGORY_ID,
     subjectName: selectedSubject.subjectName,
+    subjectTopics: selectedSubject.topics || [],
   };
 };
 
@@ -108,14 +136,29 @@ exports.getNextQuestionBankId = async (req, res) => {
 
 exports.getQuestionBank = async (req, res) => {
   try {
-    const { examMasterId, examCategoryId, subjectId, examStage, status, page = 1, limit = 10, search = "" } = req.query;
+    const { examMasterId, examCategoryId, subjectId, examStage, topicName, subTopicName, status, marks, negativeMarks, page = 1, limit = 10, search = "" } = req.query;
     const filter = {};
-    if (examMasterId) filter.examMasterId = String(examMasterId).toUpperCase();
-    if (examCategoryId) filter.examCategoryId = String(examCategoryId).toUpperCase();
-    if (subjectId) filter.subjectId = String(subjectId).toUpperCase();
-    if (String(examStage || "").trim()) filter.examStage = String(examStage).trim().toUpperCase();
+    const toUpperList = (v) =>
+      String(v || "")
+        .split(",")
+        .map((item) => String(item || "").trim().toUpperCase())
+        .filter(Boolean);
+    const examIds = toUpperList(examMasterId);
+    const categoryIds = toUpperList(examCategoryId);
+    const subjectIds = toUpperList(subjectId);
+    const stages = toUpperList(examStage);
+    const topicNames = toUpperList(topicName);
+    const subTopicNames = toUpperList(subTopicName);
+    if (examIds.length) filter.examMasterId = { $in: examIds };
+    if (categoryIds.length) filter.examCategoryId = { $in: categoryIds };
+    if (subjectIds.length) filter.subjectId = { $in: subjectIds };
+    if (stages.length) filter.examStage = { $in: stages };
+    if (topicNames.length) filter.topicName = { $in: topicNames };
+    if (subTopicNames.length) filter.subTopicName = { $in: subTopicNames };
     if (String(status || "").toUpperCase() === "ACTIVE") filter.status = "ACTIVE";
     if (String(status || "").toUpperCase() === "INACTIVE") filter.status = "INACTIVE";
+    if (String(marks || "").trim() !== "") filter.marks = Number(marks);
+    if (String(negativeMarks || "").trim() !== "") filter.negativeMarks = Number(negativeMarks);
 
     if (String(search || "").trim()) {
       filter.$or = [
@@ -157,6 +200,9 @@ exports.upsertQuestionBank = async (req, res) => {
       examMasterId,
       examCategoryId,
       subjectId,
+      examStage,
+      topicName,
+      subTopicName,
       marks = 1,
       negativeMarks = 0,
       questionText,
@@ -170,7 +216,6 @@ exports.upsertQuestionBank = async (req, res) => {
     } = req.body;
 
     if (!examMasterId) return res.status(400).json({ success: false, message: "VALID EXAM REQUIRED" });
-    if (!examCategoryId) return res.status(400).json({ success: false, message: "VALID CATEGORY REQUIRED" });
     if (!subjectId) return res.status(400).json({ success: false, message: "VALID SUBJECT REQUIRED" });
     if (!String(questionText || "").trim()) {
       return res.status(400).json({ success: false, message: "QUESTION TEXT REQUIRED" });
@@ -189,7 +234,28 @@ exports.upsertQuestionBank = async (req, res) => {
       return res.status(400).json({ success: false, message: "ALL OPTIONS REQUIRED" });
     }
 
-    const hierarchy = await buildHierarchyPayload({ examMasterId, examCategoryId, subjectId });
+    const hierarchy = await buildHierarchyPayload({ examMasterId, examCategoryId, subjectId, examStage });
+    const normalizedTopicName = String(topicName || "").trim().toUpperCase();
+    const normalizedSubTopicName = String(subTopicName || "").trim().toUpperCase();
+    if (normalizedSubTopicName && !normalizedTopicName) {
+      return res.status(400).json({ success: false, message: "TOPIC REQUIRED WHEN SUBTOPIC SELECTED" });
+    }
+    if (normalizedTopicName || normalizedSubTopicName) {
+      const topicRows = Array.isArray(hierarchy.subjectTopics) ? hierarchy.subjectTopics : [];
+      const foundTopic = topicRows.find(
+        (t) => String(t?.topicName || "").trim().toUpperCase() === normalizedTopicName
+      );
+      if (normalizedTopicName && !foundTopic) {
+        return res.status(400).json({ success: false, message: "INVALID TOPIC FOR SUBJECT" });
+      }
+      if (normalizedSubTopicName) {
+        const validSubTopics = (Array.isArray(foundTopic?.subTopics) ? foundTopic.subTopics : [])
+          .map((s) => String(s || "").trim().toUpperCase());
+        if (!validSubTopics.includes(normalizedSubTopicName)) {
+          return res.status(400).json({ success: false, message: "INVALID SUBTOPIC FOR TOPIC" });
+        }
+      }
+    }
 
     const payload = {
       ...hierarchy,
@@ -202,8 +268,11 @@ exports.upsertQuestionBank = async (req, res) => {
       optionD: String(optionD || "").trim(),
       correctOption: normalizedCorrect,
       explanationText: String(explanationText || "").trim(),
+      topicName: normalizedTopicName || undefined,
+      subTopicName: normalizedSubTopicName || undefined,
       status: String(status || "").toUpperCase() === "INACTIVE" ? "INACTIVE" : "ACTIVE",
     };
+    delete payload.subjectTopics;
 
     if (id) {
       const updated = await QuestionBank.findByIdAndUpdate(id, { $set: payload }, { new: true });
@@ -223,6 +292,9 @@ exports.upsertQuestionBank = async (req, res) => {
     if (error?.message === "SUBJECT_NOT_FOUND") return res.status(404).json({ success: false, message: "SUBJECT NOT FOUND" });
     if (error?.message === "CATEGORY_EXAM_MISMATCH") {
       return res.status(400).json({ success: false, message: "CATEGORY DOES NOT BELONG TO EXAM" });
+    }
+    if (error?.message === "CATEGORY_STAGE_MISMATCH") {
+      return res.status(400).json({ success: false, message: "EXAM STAGE DOES NOT BELONG TO CATEGORY" });
     }
     if (error?.message === "SUBJECT_CATEGORY_MISMATCH") {
       return res.status(400).json({ success: false, message: "SUBJECT DOES NOT BELONG TO CATEGORY" });
