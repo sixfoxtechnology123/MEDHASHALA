@@ -180,7 +180,7 @@ const CategoryMaster = () => {
       <div className="p-2 bg-[#0F172A] rounded-2xl text-white shadow-xl">
         <Layers size={14} />
       </div>
-      <h1 className="text-lg font-black text-slate-900 uppercase tracking-tighter">
+      <h1 className="text-lg font-bold text-slate-900 uppercase tracking-tighter">
         Category 
       </h1>
     </div>
@@ -197,7 +197,7 @@ const CategoryMaster = () => {
       {/* ADD NEW BUTTON */}
       <button
         onClick={openAddForm}
-        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-2xl font-black text-xs shadow-lg uppercase tracking-widest transition-all active:scale-95"
+        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-2xl font-bold text-xs shadow-lg uppercase tracking-widest transition-all active:scale-95"
       >
         <Plus size={14} strokeWidth={3} />
         Add New
@@ -216,7 +216,7 @@ const CategoryMaster = () => {
           placeholder="SEARCH RECORDS..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-14 pr-6 py-2 bg-white border-2 border-slate-100 rounded-[20px] font-black text-sm outline-none focus:border-blue-600 uppercase transition-all shadow-sm"
+          className="w-full pl-14 pr-6 py-2 bg-white border-2 border-slate-100 rounded-[20px] font-bold text-sm outline-none focus:border-blue-600 uppercase transition-all shadow-sm"
         />
       </div>
     </header>
@@ -226,7 +226,7 @@ const CategoryMaster = () => {
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
-              <tr className="bg-[#0F172A] text-white text-[11px] font-black uppercase tracking-widest">
+              <tr className="bg-[#0F172A] text-white text-[11px] font-bold uppercase tracking-widest">
                 <th className="p-2">ID</th>
                 <th className="p-2">Exam</th>
                 <th className="p-2">Category Name</th>
@@ -238,15 +238,15 @@ const CategoryMaster = () => {
             </thead>
             <tbody className="divide-y divide-slate-50">
               {loading ? (
-                <tr><td colSpan="7" className="p-20 text-center animate-pulse font-black text-slate-300 uppercase">Loading Records...</td></tr>
+                <tr><td colSpan="7" className="p-20 text-center animate-pulse font-bold text-slate-300 uppercase">Loading Records...</td></tr>
               ) : filteredCategories.map(cat => (
                 <tr key={cat._id} className="hover:bg-blue-50/30 transition-all">
-                  <td className="p-2 font-black text-blue-600 text-[12px]">{cat.catId}</td>
-                  <td className="p-2 font-black text-slate-900 text-[11px] uppercase">
+                  <td className="p-2 font-bold text-blue-600 text-[12px]">{cat.catId}</td>
+                  <td className="p-2 font-bold text-slate-900 text-[11px] uppercase">
                     {cat.examName || "---"}
                   </td>
                  
-                  <td className="p-2 font-black text-slate-800 text-[11px] uppercase">{cat.catName}</td>
+                  <td className="p-2 font-bold text-slate-800 text-[11px] uppercase">{cat.catName}</td>
                    <td className="p-2 text-[11px] font-semibold text-slate-700">
                     {(Array.isArray(cat.examStages) ? cat.examStages : [cat.examStage]).filter(Boolean).join(", ") || "---"}
                   </td>
@@ -259,7 +259,7 @@ const CategoryMaster = () => {
                   </td>
                   <td className="p-2">
                     <span
-                      className={`px-2 py-1 rounded-md text-[9px] font-black uppercase ${
+                      className={`px-2 py-1 rounded-md text-[9px] font-bold uppercase ${
                         cat.status === "INACTIVE"
                           ? "bg-red-100 text-red-600"
                           : "bg-emerald-100 text-emerald-700"
@@ -294,7 +294,7 @@ const CategoryMaster = () => {
           >
             <div className="flex justify-between items-center mb-6">
               <div>
-                <h2 className="text-xl font-black uppercase tracking-tighter">{editId ? "Update" : "Add"} Category</h2>
+                <h2 className="text-xl font-bold uppercase tracking-tighter">{editId ? "Update" : "Add"} Category</h2>
              
               </div>
               <button type="button" onClick={() => setIsFormOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-all">
@@ -411,7 +411,7 @@ const CategoryMaster = () => {
 
               <button 
                 disabled={isSaving}
-                className="w-full py-2 mt-2 bg-[#0F172A] text-white rounded-2xl font-black uppercase tracking-widest shadow-lg hover:bg-blue-600 transition-all flex justify-center items-center gap-3 active:scale-[0.98]"
+                className="w-full py-2 mt-2 bg-[#0F172A] text-white rounded-2xl font-bold uppercase tracking-widest shadow-lg hover:bg-blue-600 transition-all flex justify-center items-center gap-3 active:scale-[0.98]"
               >
                 {isSaving ? <Loader2 className="animate-spin" size={15} /> : <Save size={18} />}
                 {editId ? "Update" : "Save"}

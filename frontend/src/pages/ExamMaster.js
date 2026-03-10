@@ -144,7 +144,7 @@ const ExamMaster = () => {
             <div className="p-2 bg-[#0F172A] rounded-2xl text-white shadow-xl">
               <BookOpen size={14} />
             </div>
-            <h1 className="text-lg font-black text-slate-900 uppercase tracking-tighter">
+            <h1 className="text-lg font-bold text-slate-900 uppercase tracking-tighter">
               Exam
             </h1>
           </div>
@@ -159,7 +159,7 @@ const ExamMaster = () => {
 
             <button
               onClick={handleAddNew}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-2xl font-black text-xs shadow-lg uppercase tracking-widest"
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-2xl font-bold text-xs shadow-lg uppercase tracking-widest"
             >
               <Plus size={14} strokeWidth={3} />
               Add New
@@ -178,7 +178,7 @@ const ExamMaster = () => {
             placeholder="SEARCH RECORDS..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-14 pr-6 py-2 bg-white border-2 border-slate-100 rounded-[20px] font-black text-sm outline-none focus:border-blue-600 uppercase"
+            className="w-full pl-14 pr-6 py-2 bg-white border-2 border-slate-100 rounded-[20px] font-bold text-sm outline-none focus:border-blue-600 uppercase"
           />
         </div>
       </header>
@@ -189,10 +189,10 @@ const ExamMaster = () => {
           <table className="w-full text-left">
             <thead>
               <tr className="bg-[#0F172A] text-white">
-                <th className="p-2 text-[10px] font-black uppercase">ID</th>
-                <th className="p-2 text-[10px] font-black uppercase">Exam Name</th>
-                <th className="p-2 text-[10px] font-black uppercase">Status</th>
-                <th className="p-2 text-[10px] font-black uppercase text-center">
+                <th className="p-2 text-[10px] font-bold uppercase">ID</th>
+                <th className="p-2 text-[10px] font-bold uppercase">Exam Name</th>
+                <th className="p-2 text-[10px] font-bold uppercase">Status</th>
+                <th className="p-2 text-[10px] font-bold uppercase text-center">
                   Manage
                 </th>
               </tr>
@@ -200,22 +200,22 @@ const ExamMaster = () => {
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan="4" className="p-20 text-center font-black text-slate-400 uppercase">
+                  <td colSpan="4" className="p-20 text-center font-bold text-slate-400 uppercase">
                     Syncing Database...
                   </td>
                 </tr>
               ) : filteredData.length > 0 ? (
                 filteredData.map((item) => (
                   <tr key={item._id} className="hover:bg-blue-50/30">
-                    <td className="p-2 font-black text-blue-600 text-xs">
+                    <td className="p-2 font-bold text-blue-600 text-xs">
                       {item.examCode}
                     </td>
-                    <td className="p-2 font-black text-slate-800 text-xs uppercase">
+                    <td className="p-2 font-bold text-slate-800 text-xs uppercase">
                       {item.examName}
                     </td>
                     <td className="p-2">
                       <span
-                        className={`px-2 py-1 rounded-md text-[9px] font-black uppercase ${
+                        className={`px-2 py-1 rounded-md text-[9px] font-bold uppercase ${
                           item.status === "INACTIVE"
                             ? "bg-red-100 text-red-600"
                             : "bg-emerald-100 text-emerald-700"
@@ -242,7 +242,7 @@ const ExamMaster = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="4" className="p-20 text-center font-black text-slate-300 uppercase text-xl">
+                  <td colSpan="4" className="p-20 text-center font-bold text-slate-300 uppercase text-xl">
                     No Records Found
                   </td>
                 </tr>
@@ -265,7 +265,7 @@ const ExamMaster = () => {
             className="relative bg-white w-full max-w-xl p-10 rounded-[40px] shadow-2xl"
           >
             <div className="flex justify-between items-center mb-10">
-              <h2 className="text-2xl font-black uppercase">
+              <h2 className="text-2xl font-bold uppercase">
                 {editId ? "Update Exam" : "New Exam"}
               </h2>
               <button type="button" onClick={() => setIsModalOpen(false)}>
@@ -323,7 +323,7 @@ const ExamMaster = () => {
 
               <button
                 disabled={isSaving}
-                className="w-full py-2 bg-[#0F172A] hover:bg-blue-600 text-white font-black rounded-2xl shadow-xl flex items-center justify-center gap-3"
+                className="w-full py-2 bg-[#0F172A] hover:bg-blue-600 text-white font-bold rounded-2xl shadow-xl flex items-center justify-center gap-3"
               >
                 {isSaving ? <Loader2 className="animate-spin" /> : <Save size={15} />}
                 {editId ? "UPDATE RECORD" : "SAVE RECORD"}

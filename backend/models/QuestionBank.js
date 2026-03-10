@@ -25,6 +25,14 @@ const questionBankSchema = new mongoose.Schema(
     optionD: { type: String, required: true, trim: true },
     correctOption: { type: String, enum: ["A", "B", "C", "D"], required: true },
     explanationText: { type: String, trim: true, default: "" },
+    questionImages: { type: [String], default: [] },
+    optionImages: {
+      A: { type: [String], default: [] },
+      B: { type: [String], default: [] },
+      C: { type: [String], default: [] },
+      D: { type: [String], default: [] },
+    },
+    explanationImages: { type: [String], default: [] },
     status: {
       type: String,
       enum: ["ACTIVE", "INACTIVE"],

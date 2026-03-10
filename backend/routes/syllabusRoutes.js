@@ -7,6 +7,7 @@ router.get("/next-id", protect, syllabusCtrl.getNextSyllabusId);
 router.get("/all", protect, syllabusCtrl.getAllSyllabus);
 router.get("/:id", protect, syllabusCtrl.getSyllabusById);
 router.post("/upsert", protect, adminOnly, syllabusCtrl.upsertSyllabus);
+router.post("/bulk-create", protect, adminOnly, syllabusCtrl.bulkCreateSyllabus);
 router.delete("/:id", protect, adminOnly, syllabusCtrl.deleteSyllabus);
 
 module.exports = router;

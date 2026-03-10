@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Edit, Loader2, Plus, RefreshCw, Save, Search, Trash2, X } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Edit, Loader2, Plus, RefreshCw, Save, Search, Trash2, X,ChevronRight } from "lucide-react";
 import toast from "react-hot-toast";
 import axios from "../api/axios";
 
@@ -17,6 +17,9 @@ const emptyQuestion = {
   optionD: "",
   correctOption: "A",
   explanationText: "",
+  questionImages: [],
+  optionImages: { A: [], B: [], C: [], D: [] },
+  explanationImages: [],
   status: "ACTIVE",
 };
 
@@ -32,6 +35,7 @@ const isNoCategoryValue = (value) => {
 
 const QuestionBank = () => {
   const [exams, setExams] = useState([]);
+  const [showSymbols, setShowSymbols] = useState(false);
   const [categories, setCategories] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [rows, setRows] = useState([]);
@@ -45,6 +49,78 @@ const QuestionBank = () => {
   const [baseForm, setBaseForm] = useState({ examMasterId: "", examCategoryId: "", examStage: "", subjectId: "", topicName: "", subTopicName: "" });
   const [questionForm, setQuestionForm] = useState({ ...emptyQuestion });
   const [draftQuestions, setDraftQuestions] = useState([]);
+  const [activeField, setActiveField] = useState("questionText");
+  const fieldRefs = useRef({});
+
+const symbolPalette = [
+
+  // BASIC MATH
+  "+", "−", "×", "÷", "=", "≠", "≈", "≡",
+  "<", ">", "≤", "≥", "±", "∓",
+
+  // ALGEBRA / CALCULUS
+  "√", "∛", "∜",
+  "∑", "∏",
+  "∫", "∬", "∭",
+  "∂", "∇",
+  "∞", "∝",
+  "∠", "∟",
+
+  // SET THEORY
+  "∈", "∉",
+  "∅",
+  "⊂", "⊃",
+  "⊆", "⊇",
+  "∪", "∩",
+
+  // LOGIC
+  "¬", "∧", "∨",
+  "⇒", "⇔",
+  "∀", "∃",
+
+  // ARROWS
+  "→", "←", "↑", "↓",
+  "↔", "↕",
+  "⇒", "⇐", "⇔",
+
+  // GREEK LETTERS (COMMON IN MATH & PHYSICS)
+  "α","β","γ","δ","ε","ζ","η","θ",
+  "ι","κ","λ","μ","ν","ξ","ο","π",
+  "ρ","σ","τ","υ","φ","χ","ψ","ω",
+
+  // CAPITAL GREEK
+  "Α","Β","Γ","Δ","Ε","Ζ","Η","Θ",
+  "Ι","Κ","Λ","Μ","Ν","Ξ","Ο","Π",
+  "Ρ","Σ","Τ","Υ","Φ","Χ","Ψ","Ω",
+
+  // PHYSICS SYMBOLS
+  "Δ","λ","μ","ρ","σ","τ","ω",
+  "ħ","ϕ","ϑ","ϱ",
+
+  // CHEMISTRY / SCIENCE
+  "°", "℃", "℉",
+  "Å", "Å",
+  "mol", "Na", "Cl",
+
+  // UNITS
+  "m","cm","mm",
+  "kg","g",
+  "s","ms",
+  "A","V","W","J","N","Pa","Hz",
+
+  // MISC
+  "°", "′", "″",
+  "…", "•", "∴", "∵"
+
+];
+  const fieldLabels = {
+    questionText: "Question",
+    optionA: "Option A",
+    optionB: "Option B",
+    optionC: "Option C",
+    optionD: "Option D",
+    explanationText: "Explanation",
+  };
 
   const filteredCategories = useMemo(() => {
     if (!filters.examMasterId) return [];
@@ -243,6 +319,9 @@ const QuestionBank = () => {
       optionD: row.optionD || "",
       correctOption: row.correctOption || "A",
       explanationText: row.explanationText || "",
+      questionImages: Array.isArray(row.questionImages) ? row.questionImages : [],
+      optionImages: row.optionImages || { A: [], B: [], C: [], D: [] },
+      explanationImages: Array.isArray(row.explanationImages) ? row.explanationImages : [],
       status: row.status || "ACTIVE",
     });
     setIsModalOpen(true);
@@ -252,6 +331,70 @@ const QuestionBank = () => {
     if (!String(q.questionText || "").trim()) return "ENTER QUESTION";
     if (!String(q.optionA || "").trim() || !String(q.optionB || "").trim() || !String(q.optionC || "").trim() || !String(q.optionD || "").trim()) return "ENTER ALL OPTIONS";
     return "";
+  };
+
+  const readFilesAsDataUrls = (fileList) => {
+    const files = Array.from(fileList || []);
+    return Promise.all(
+      files.map(
+        (file) =>
+          new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result || ""));
+            reader.onerror = () => reject(new Error("FILE_READ_FAILED"));
+            reader.readAsDataURL(file);
+          })
+      )
+    );
+  };
+
+  const appendImages = async (field, fileList, optionKey) => {
+    if (!fileList || fileList.length === 0) return;
+    try {
+      const images = await readFilesAsDataUrls(fileList);
+      setQuestionForm((prev) => {
+        if (field === "optionImages") {
+          const nextOption = { ...(prev.optionImages || {}) };
+          nextOption[optionKey] = [ ...(nextOption[optionKey] || []), ...images ];
+          return { ...prev, optionImages: nextOption };
+        }
+        return { ...prev, [field]: [ ...(prev[field] || []), ...images ] };
+      });
+    } catch {
+      toastErrorOnce("IMAGE LOAD FAILED");
+    }
+  };
+
+  const removeImage = (field, index, optionKey) => {
+    setQuestionForm((prev) => {
+      if (field === "optionImages") {
+        const nextOption = { ...(prev.optionImages || {}) };
+        nextOption[optionKey] = (nextOption[optionKey] || []).filter((_, i) => i !== index);
+        return { ...prev, optionImages: nextOption };
+      }
+      return { ...prev, [field]: (prev[field] || []).filter((_, i) => i !== index) };
+    });
+  };
+
+  const insertSymbol = (symbol) => {
+    const fieldKey = activeField || "questionText";
+    const input = fieldRefs.current[fieldKey];
+    if (!input) {
+      setQuestionForm((prev) => ({ ...prev, [fieldKey]: `${prev[fieldKey] || ""}${symbol}` }));
+      return;
+    }
+    const start = input.selectionStart ?? String(questionForm[fieldKey] || "").length;
+    const end = input.selectionEnd ?? start;
+    setQuestionForm((prev) => {
+      const value = String(prev[fieldKey] || "");
+      const nextValue = `${value.slice(0, start)}${symbol}${value.slice(end)}`;
+      return { ...prev, [fieldKey]: nextValue };
+    });
+    setTimeout(() => {
+      input.focus();
+      const pos = start + symbol.length;
+      if (input.setSelectionRange) input.setSelectionRange(pos, pos);
+    }, 0);
   };
 
   const addDraftQuestion = () => {
@@ -331,45 +474,45 @@ const QuestionBank = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-8 gap-3">
-            <select value={filters.examMasterId} onChange={(e) => { setFilters((prev) => ({ ...prev, examMasterId: e.target.value, examCategoryId: "", examStage: "", subjectId: "", topicName: "", subTopicName: "" })); setPagination((prev) => ({ ...prev, page: 1 })); }} className="w-full p-2 border border-slate-200 rounded-xl text-sm font-normal">
+            <select value={filters.examMasterId} onChange={(e) => { setFilters((prev) => ({ ...prev, examMasterId: e.target.value, examCategoryId: "", examStage: "", subjectId: "", topicName: "", subTopicName: "" })); setPagination((prev) => ({ ...prev, page: 1 })); }} className="w-full p-2 border border-slate-200 rounded-xl text-sm font-semibold">
               <option value="">All Exams</option>
               {exams.map((ex) => <option key={ex.examCode} value={ex.examCode}>{ex.examName}</option>)}
             </select>
-            {filterNeedsCategory && <select value={filters.examCategoryId} onChange={(e) => { const categoryId = e.target.value; setFilters((prev) => ({ ...prev, examCategoryId: categoryId, examStage: "", subjectId: "", topicName: "", subTopicName: "" })); setPagination((prev) => ({ ...prev, page: 1 })); }} className="w-full p-2 border border-slate-200 rounded-xl text-sm font-normal">
+            {filterNeedsCategory && <select value={filters.examCategoryId} onChange={(e) => { const categoryId = e.target.value; setFilters((prev) => ({ ...prev, examCategoryId: categoryId, examStage: "", subjectId: "", topicName: "", subTopicName: "" })); setPagination((prev) => ({ ...prev, page: 1 })); }} className="w-full p-2 border border-slate-200 rounded-xl text-sm font-semibold">
               <option value="">All Categories</option>
               {filteredCategories.map((cat) => <option key={cat.catId} value={cat.catId}>{cat.catName}</option>)}
             </select>}
             {filterNeedsStage && (
-              <select value={filters.examStage} onChange={(e) => { setFilters((prev) => ({ ...prev, examStage: e.target.value, subjectId: "", topicName: "", subTopicName: "" })); setPagination((prev) => ({ ...prev, page: 1 })); }} className="w-full p-2 border border-slate-200 rounded-xl text-sm font-normal">
+              <select value={filters.examStage} onChange={(e) => { setFilters((prev) => ({ ...prev, examStage: e.target.value, subjectId: "", topicName: "", subTopicName: "" })); setPagination((prev) => ({ ...prev, page: 1 })); }} className="w-full p-2 border border-slate-200 rounded-xl text-sm font-semibold">
                 <option value="">All Stages</option>
                 {filterStageOptions.map((stage) => <option key={stage} value={stage}>{stage}</option>)}
               </select>
             )}
-            <select value={filters.subjectId} onChange={(e) => { setFilters((prev) => ({ ...prev, subjectId: e.target.value, topicName: "", subTopicName: "" })); setPagination((prev) => ({ ...prev, page: 1 })); }} className="w-full p-2 border border-slate-200 rounded-xl text-sm font-normal">
+            <select value={filters.subjectId} onChange={(e) => { setFilters((prev) => ({ ...prev, subjectId: e.target.value, topicName: "", subTopicName: "" })); setPagination((prev) => ({ ...prev, page: 1 })); }} className="w-full p-2 border border-slate-200 rounded-xl text-sm font-semibold">
               <option value="">All Subjects</option>
               {filteredSubjects.map((sub) => <option key={sub.syllabusId} value={sub.syllabusId}>{sub.subjectName}</option>)}
             </select>
-            <select value={filters.topicName} onChange={(e) => { setFilters((prev) => ({ ...prev, topicName: e.target.value, subTopicName: "" })); setPagination((prev) => ({ ...prev, page: 1 })); }} className="w-full p-2 border border-slate-200 rounded-xl text-sm font-normal">
+            <select value={filters.topicName} onChange={(e) => { setFilters((prev) => ({ ...prev, topicName: e.target.value, subTopicName: "" })); setPagination((prev) => ({ ...prev, page: 1 })); }} className="w-full p-2 border border-slate-200 rounded-xl text-sm font-semibold">
               <option value="">All Topics</option>
               {filterTopicOptions.map((topic) => <option key={topic} value={topic}>{topic}</option>)}
             </select>
-            <select value={filters.subTopicName} onChange={(e) => { setFilters((prev) => ({ ...prev, subTopicName: e.target.value })); setPagination((prev) => ({ ...prev, page: 1 })); }} className="w-full p-2 border border-slate-200 rounded-xl text-sm font-normal">
+            <select value={filters.subTopicName} onChange={(e) => { setFilters((prev) => ({ ...prev, subTopicName: e.target.value })); setPagination((prev) => ({ ...prev, page: 1 })); }} className="w-full p-2 border border-slate-200 rounded-xl text-sm font-semibold">
               <option value="">All SubTopics</option>
               {filterSubTopicOptions.map((sub) => <option key={sub} value={sub}>{sub}</option>)}
             </select>
-            <select value={filters.status} onChange={(e) => { setFilters((prev) => ({ ...prev, status: e.target.value })); setPagination((prev) => ({ ...prev, page: 1 })); }} className="w-full p-2 border border-slate-200 rounded-xl text-sm font-normal">
+            <select value={filters.status} onChange={(e) => { setFilters((prev) => ({ ...prev, status: e.target.value })); setPagination((prev) => ({ ...prev, page: 1 })); }} className="w-full p-2 border border-slate-200 rounded-xl text-sm font-semibold">
               <option value="">All Status</option>
               <option value="ACTIVE">ACTIVE</option>
               <option value="INACTIVE">INACTIVE</option>
             </select>
-            <select value={pagination.page} onChange={(e) => setPagination((prev) => ({ ...prev, page: Number(e.target.value) }))} className="w-full p-2 border border-slate-200 rounded-xl text-sm font-normal">
+            <select value={pagination.page} onChange={(e) => setPagination((prev) => ({ ...prev, page: Number(e.target.value) }))} className="w-full p-2 border border-slate-200 rounded-xl text-sm font-semibold">
               {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((p) => <option key={p} value={p}>Page {p}</option>)}
             </select>
           </div>
 
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-            <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSearch()} className="w-full pl-11 pr-28 py-2 border border-slate-200 rounded-xl text-sm font-normal" placeholder="Search question, ID, subject..." />
+            <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSearch()} className="w-full pl-11 pr-28 py-2 border border-slate-200 rounded-xl text-sm font-semibold" placeholder="Search question, ID, subject..." />
             <button onClick={handleSearch} className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 text-xs bg-slate-900 text-white rounded-lg">Search</button>
           </div>
         </div>
@@ -382,7 +525,7 @@ const QuestionBank = () => {
               <tbody className="divide-y divide-slate-50">
               {loading ? <tr><td colSpan={(hasStageInRows ? 1 : 0) + (hasTopicInRows ? 2 : 0) + 8} className="p-20 text-center text-slate-300 font-semibold">Loading...</td></tr> : rows.length > 0 ? rows.map((row) => (
                 <tr key={row._id} className="hover:bg-blue-50/30">
-                  <td className="p-2 text-blue-600 text-sm font-semibold">{row.questionBankId}</td><td className="p-2 text-xs font-normal">{row.examName}</td>{hasStageInRows && <td className="p-2 text-xs font-normal">{row.examStage || "---"}</td>}<td className="p-2 text-xs font-normal">{row.categoryName}</td><td className="p-2 text-xs font-normal">{row.subjectName}</td>{hasTopicInRows && <td className="p-2 text-xs font-normal">{row.topicName || "---"}</td>}{hasTopicInRows && <td className="p-2 text-xs font-normal">{row.subTopicName || "---"}</td>}<td className="p-2 text-xs font-normal">{row.marks}</td><td className="p-2 text-xs font-normal">{row.negativeMarks}</td><td className="p-2 text-xs font-normal">{row.status}</td>
+                  <td className="p-2 text-blue-600 text-sm font-semibold">{row.questionBankId}</td><td className="p-2 text-xs font-semibold">{row.examName}</td>{hasStageInRows && <td className="p-2 text-xs font-semibold">{row.examStage || "---"}</td>}<td className="p-2 text-xs font-semibold">{row.categoryName}</td><td className="p-2 text-xs font-semibold">{row.subjectName}</td>{hasTopicInRows && <td className="p-2 text-xs font-semibold">{row.topicName || "---"}</td>}{hasTopicInRows && <td className="p-2 text-xs font-semibold">{row.subTopicName || "---"}</td>}<td className="p-2 text-xs font-semibold">{row.marks}</td><td className="p-2 text-xs font-semibold">{row.negativeMarks}</td><td className="p-2 text-xs font-semibold">{row.status}</td>
                   <td className="p-2 flex justify-center gap-2"><button onClick={() => handleEdit(row)} className="p-2 bg-blue-50 text-blue-600 rounded-xl"><Edit size={16} /></button><button onClick={() => handleDelete(row._id)} className="p-2 bg-red-50 text-red-400 rounded-xl"><Trash2 size={16} /></button></td>
                 </tr>
               )) : <tr><td colSpan={(hasStageInRows ? 1 : 0) + (hasTopicInRows ? 2 : 0) + 8} className="p-20 text-center text-slate-300 font-semibold">No Records</td></tr>}
@@ -397,44 +540,182 @@ const QuestionBank = () => {
           <form onSubmit={handleSubmit} className="relative bg-white w-full max-w-6xl p-8 rounded-[30px] shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6"><h2 className="text-xl font-semibold">{editId ? "Update Question" : "Add Multiple Questions"}</h2><button type="button" onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full"><X size={20} /></button></div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div><label className="text-sm font-normal block mb-1">Exam</label><select required value={baseForm.examMasterId} onChange={(e) => setBaseForm({ ...baseForm, examMasterId: e.target.value, examCategoryId: "", examStage: "", subjectId: "", topicName: "", subTopicName: "" })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-normal"><option value="">-- Select Exam --</option>{exams.map((ex) => <option key={ex.examCode} value={ex.examCode}>{ex.examName}</option>)}</select></div>
-              {modalNeedsCategory && <div><label className="text-sm font-normal block mb-1">Category</label><select required value={baseForm.examCategoryId} onChange={(e) => { const categoryId = e.target.value; setBaseForm({ ...baseForm, examCategoryId: categoryId, examStage: "", subjectId: "", topicName: "", subTopicName: "" }); }} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-normal"><option value="">-- Select Category --</option>{modalFilteredCategories.map((cat) => <option key={cat.catId} value={cat.catId}>{cat.catName}</option>)}</select></div>}
-              {modalNeedsStage && <div><label className="text-sm font-normal block mb-1">Exam Stage</label><select value={baseForm.examStage} onChange={(e) => setBaseForm({ ...baseForm, examStage: e.target.value, subjectId: "", topicName: "", subTopicName: "" })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-normal"><option value="">-- Select Stage --</option>{modalStageOptions.map((stage) => <option key={stage} value={stage}>{stage}</option>)}</select></div>}
-              <div><label className="text-sm font-normal block mb-1">Subject</label><select required value={baseForm.subjectId} onChange={(e) => setBaseForm({ ...baseForm, subjectId: e.target.value, topicName: "", subTopicName: "" })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-normal"><option value="">-- Select Subject --</option>{modalFilteredSubjects.map((sub) => <option key={sub.syllabusId} value={sub.syllabusId}>{sub.subjectName}</option>)}</select></div>
-              <div><label className="text-sm font-normal block mb-1">Topic</label><select value={baseForm.topicName} onChange={(e) => setBaseForm({ ...baseForm, topicName: e.target.value, subTopicName: "" })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-normal"><option value="">-- Select Topic --</option>{modalTopicOptions.map((topic) => <option key={topic} value={topic}>{topic}</option>)}</select></div>
-              <div><label className="text-sm font-normal block mb-1">SubTopic</label><select value={baseForm.subTopicName} onChange={(e) => setBaseForm({ ...baseForm, subTopicName: e.target.value })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-normal"><option value="">-- Select SubTopic --</option>{modalSubTopicOptions.map((sub) => <option key={sub} value={sub}>{sub}</option>)}</select></div>
+              <div><label className="text-sm font-semibold block mb-1">Exam</label><select required value={baseForm.examMasterId} onChange={(e) => setBaseForm({ ...baseForm, examMasterId: e.target.value, examCategoryId: "", examStage: "", subjectId: "", topicName: "", subTopicName: "" })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-semibold"><option value="">-- Select Exam --</option>{exams.map((ex) => <option key={ex.examCode} value={ex.examCode}>{ex.examName}</option>)}</select></div>
+              {modalNeedsCategory && <div><label className="text-sm font-semibold block mb-1">Category</label><select required value={baseForm.examCategoryId} onChange={(e) => { const categoryId = e.target.value; setBaseForm({ ...baseForm, examCategoryId: categoryId, examStage: "", subjectId: "", topicName: "", subTopicName: "" }); }} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-semibold"><option value="">-- Select Category --</option>{modalFilteredCategories.map((cat) => <option key={cat.catId} value={cat.catId}>{cat.catName}</option>)}</select></div>}
+              {modalNeedsStage && <div><label className="text-sm font-semibold block mb-1">Exam Stage</label><select value={baseForm.examStage} onChange={(e) => setBaseForm({ ...baseForm, examStage: e.target.value, subjectId: "", topicName: "", subTopicName: "" })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-semibold"><option value="">-- Select Stage --</option>{modalStageOptions.map((stage) => <option key={stage} value={stage}>{stage}</option>)}</select></div>}
+              <div><label className="text-sm font-semibold block mb-1">Subject</label><select required value={baseForm.subjectId} onChange={(e) => setBaseForm({ ...baseForm, subjectId: e.target.value, topicName: "", subTopicName: "" })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-semibold"><option value="">-- Select Subject --</option>{modalFilteredSubjects.map((sub) => <option key={sub.syllabusId} value={sub.syllabusId}>{sub.subjectName}</option>)}</select></div>
+              <div><label className="text-sm font-semibold block mb-1">Topic</label><select value={baseForm.topicName} onChange={(e) => setBaseForm({ ...baseForm, topicName: e.target.value, subTopicName: "" })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-semibold"><option value="">-- Select Topic --</option>{modalTopicOptions.map((topic) => <option key={topic} value={topic}>{topic}</option>)}</select></div>
+              <div><label className="text-sm font-semibold block mb-1">SubTopic</label><select value={baseForm.subTopicName} onChange={(e) => setBaseForm({ ...baseForm, subTopicName: e.target.value })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-semibold"><option value="">-- Select SubTopic --</option>{modalSubTopicOptions.map((sub) => <option key={sub} value={sub}>{sub}</option>)}</select></div>
             </div>
             <div className="mt-5 border border-slate-200 rounded-2xl p-4 bg-slate-50 space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div><label className="text-sm font-normal block mb-1">Question ID</label><div className="p-3 bg-white border border-slate-200 rounded-xl text-sm font-normal text-blue-600">{questionForm.questionBankId || "..."}</div></div>
-                <div><label className="text-sm font-normal block mb-1">Marks / Question</label><input type="number" min="0" step="0.5" value={questionForm.marks} onChange={(e) => setQuestionForm({ ...questionForm, marks: Number(e.target.value) })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-normal" /></div>
-                <div><label className="text-sm font-normal block mb-1">Negative Marks</label><input type="number" min="0" step="0.25" value={questionForm.negativeMarks} onChange={(e) => setQuestionForm({ ...questionForm, negativeMarks: Number(e.target.value) })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-normal" /></div>
+                <div><label className="text-sm font-semibold block mb-1">Question ID</label><div className="p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-blue-600">{questionForm.questionBankId || "..."}</div></div>
+                <div><label className="text-sm font-semibold block mb-1">Marks / Question</label><input type="number" min="0" step="0.5" value={questionForm.marks} onChange={(e) => setQuestionForm({ ...questionForm, marks: Number(e.target.value) })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-semibold" /></div>
+                <div><label className="text-sm font-semibold block mb-1">Negative Marks</label><input type="number" min="0" step="0.25" value={questionForm.negativeMarks} onChange={(e) => setQuestionForm({ ...questionForm, negativeMarks: Number(e.target.value) })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-semibold" /></div>
               </div>
-              <textarea value={questionForm.questionText} onChange={(e) => setQuestionForm({ ...questionForm, questionText: e.target.value })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-normal" placeholder="Question" />
+           <div className="space-y-2">
+            {/* Toggle Button with Arrow */}
+            <button
+              type="button"
+              onClick={() => setShowSymbols(!showSymbols)}
+              className="flex items-center gap-2 px-3 py-1.5 bg-sky-100 hover:bg-sky-200 text-sky-800 rounded-xl transition-all border border-sky-200"
+            >
+              <div className={`transition-transform duration-200 ${showSymbols ? "rotate-90" : ""}`}>
+                <ChevronRight size={14} strokeWidth={3} />
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-widest">
+                {showSymbols ? "Hide Symbols" : "Show Symbols"}
+              </span>
+            </button>
+
+            {/* Collapsible Section */}
+            {showSymbols && (
+              <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-sky-200 bg-white p-3 shadow-sm transition-all animate-in fade-in slide-in-from-top-2">
+                <div className="w-full mb-1">
+                  <span className="text-[10px] font-black uppercase text-sky-600 tracking-tight">
+                    Inserting to: <span className="text-slate-900">{fieldLabels[activeField] || "Question"}</span>
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {symbolPalette.map((sym) => (
+                    <button
+                      key={sym}
+                      type="button"
+                      onClick={() => insertSymbol(sym)}
+                      className="px-2.5 py-1 text-xs font-bold bg-slate-50 border border-slate-200 text-slate-700 rounded-lg hover:bg-sky-600 hover:text-white hover:border-sky-600 transition-all shadow-sm active:scale-90"
+                    >
+                      {sym}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+              <textarea
+                ref={(el) => { fieldRefs.current.questionText = el; }}
+                onFocus={() => setActiveField("questionText")}
+                value={questionForm.questionText}
+                onChange={(e) => setQuestionForm({ ...questionForm, questionText: e.target.value })}
+                className="w-full p-3 border border-slate-200 rounded-xl text-sm font-semibold"
+                placeholder="Question"
+              />
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input value={questionForm.optionA} onChange={(e) => setQuestionForm({ ...questionForm, optionA: e.target.value })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-normal" placeholder="Option A" />
-                <input value={questionForm.optionB} onChange={(e) => setQuestionForm({ ...questionForm, optionB: e.target.value })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-normal" placeholder="Option B" />
-                <input value={questionForm.optionC} onChange={(e) => setQuestionForm({ ...questionForm, optionC: e.target.value })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-normal" placeholder="Option C" />
-                <input value={questionForm.optionD} onChange={(e) => setQuestionForm({ ...questionForm, optionD: e.target.value })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-normal" placeholder="Option D" />
+                <div>
+                  <label className="text-sm font-semibold block mb-1">Question Images</label>
+                  <input type="file" accept="image/*" multiple onChange={(e) => appendImages("questionImages", e.target.files)} className="w-full p-2 border border-slate-200 rounded-xl text-sm" />
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {(questionForm.questionImages || []).map((img, idx) => (
+                      <div key={`qimg-${idx}`} className="relative w-16 h-16 border border-slate-200 rounded-lg overflow-hidden">
+                        <img src={img} alt="question" className="w-full h-full object-cover" />
+                        <button type="button" onClick={() => removeImage("questionImages", idx)} className="absolute top-1 right-1 bg-white/90 rounded-full p-1">
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input
+                  ref={(el) => { fieldRefs.current.optionA = el; }}
+                  onFocus={() => setActiveField("optionA")}
+                  value={questionForm.optionA}
+                  onChange={(e) => setQuestionForm({ ...questionForm, optionA: e.target.value })}
+                  className="w-full p-3 border border-slate-200 rounded-xl text-sm font-semibold"
+                  placeholder="Option A"
+                />
+                <input
+                  ref={(el) => { fieldRefs.current.optionB = el; }}
+                  onFocus={() => setActiveField("optionB")}
+                  value={questionForm.optionB}
+                  onChange={(e) => setQuestionForm({ ...questionForm, optionB: e.target.value })}
+                  className="w-full p-3 border border-slate-200 rounded-xl text-sm font-semibold"
+                  placeholder="Option B"
+                />
+                <input
+                  ref={(el) => { fieldRefs.current.optionC = el; }}
+                  onFocus={() => setActiveField("optionC")}
+                  value={questionForm.optionC}
+                  onChange={(e) => setQuestionForm({ ...questionForm, optionC: e.target.value })}
+                  className="w-full p-3 border border-slate-200 rounded-xl text-sm font-semibold"
+                  placeholder="Option C"
+                />
+                <input
+                  ref={(el) => { fieldRefs.current.optionD = el; }}
+                  onFocus={() => setActiveField("optionD")}
+                  value={questionForm.optionD}
+                  onChange={(e) => setQuestionForm({ ...questionForm, optionD: e.target.value })}
+                  className="w-full p-3 border border-slate-200 rounded-xl text-sm font-semibold"
+                  placeholder="Option D"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {["A", "B", "C", "D"].map((opt) => (
+                  <div key={`optimg-${opt}`}>
+                    <label className="text-sm font-semibold block mb-1">Option {opt} Images</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={(e) => appendImages("optionImages", e.target.files, opt)}
+                      className="w-full p-2 border border-slate-200 rounded-xl text-sm"
+                    />
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {(questionForm.optionImages?.[opt] || []).map((img, idx) => (
+                        <div key={`opt-${opt}-${idx}`} className="relative w-16 h-16 border border-slate-200 rounded-lg overflow-hidden">
+                          <img src={img} alt={`option-${opt}`} className="w-full h-full object-cover" />
+                          <button type="button" onClick={() => removeImage("optionImages", idx, opt)} className="absolute top-1 right-1 bg-white/90 rounded-full p-1">
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <select value={questionForm.correctOption} onChange={(e) => setQuestionForm({ ...questionForm, correctOption: e.target.value })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-normal"><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select>
-                <select value={questionForm.status} onChange={(e) => setQuestionForm({ ...questionForm, status: e.target.value })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-normal"><option value="ACTIVE">ACTIVE</option><option value="INACTIVE">INACTIVE</option></select>
+                <select value={questionForm.correctOption} onChange={(e) => setQuestionForm({ ...questionForm, correctOption: e.target.value })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-semibold"><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select>
+                <select value={questionForm.status} onChange={(e) => setQuestionForm({ ...questionForm, status: e.target.value })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-semibold"><option value="ACTIVE">ACTIVE</option><option value="INACTIVE">INACTIVE</option></select>
               </div>
-              <textarea value={questionForm.explanationText} onChange={(e) => setQuestionForm({ ...questionForm, explanationText: e.target.value })} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-normal" placeholder="Explanation" />
-              {!editId && <button type="button" onClick={addDraftQuestion} className="w-full py-3 bg-blue-600 text-white rounded-xl text-sm font-normal hover:bg-blue-700">Add In Draft List</button>}
+              <textarea
+                ref={(el) => { fieldRefs.current.explanationText = el; }}
+                onFocus={() => setActiveField("explanationText")}
+                value={questionForm.explanationText}
+                onChange={(e) => setQuestionForm({ ...questionForm, explanationText: e.target.value })}
+                className="w-full p-3 border border-slate-200 rounded-xl text-sm font-semibold"
+                placeholder="Explanation"
+              />
+              <div>
+                <label className="text-sm font-semibold block mb-1">Explanation Images</label>
+                <input type="file" accept="image/*" multiple onChange={(e) => appendImages("explanationImages", e.target.files)} className="w-full p-2 border border-slate-200 rounded-xl text-sm" />
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {(questionForm.explanationImages || []).map((img, idx) => (
+                    <div key={`eimg-${idx}`} className="relative w-16 h-16 border border-slate-200 rounded-lg overflow-hidden">
+                      <img src={img} alt="explanation" className="w-full h-full object-cover" />
+                      <button type="button" onClick={() => removeImage("explanationImages", idx)} className="absolute top-1 right-1 bg-white/90 rounded-full p-1">
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {!editId && <button type="button" onClick={addDraftQuestion} className="w-full py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700">Add In Draft List</button>}
             </div>
             {!editId && (
               <div className="mt-5 space-y-2">
                 {draftQuestions.map((q, idx) => (
                   <div key={`${q.questionBankId}-${idx}`} className="bg-white border border-slate-200 rounded-xl p-3 flex items-start justify-between gap-3">
-                    <div><p className="text-sm font-semibold text-blue-700">{q.questionBankId}</p><p className="text-sm font-normal text-slate-800">{q.questionText}</p></div>
+                    <div><p className="text-sm font-semibold text-blue-700">{q.questionBankId}</p><p className="text-sm font-semibold text-slate-800">{q.questionText}</p></div>
                     <div className="flex gap-2"><button type="button" onClick={() => { setQuestionForm({ ...q }); setDraftQuestions((prev) => prev.filter((_, i) => i !== idx)); }} className="p-2 bg-blue-50 text-blue-600 rounded-xl"><Edit size={15} /></button><button type="button" onClick={() => setDraftQuestions((prev) => prev.filter((_, i) => i !== idx))} className="p-2 bg-red-50 text-red-500 rounded-xl"><Trash2 size={15} /></button></div>
                   </div>
                 ))}
               </div>
             )}
-            <button disabled={isSaving} className="w-full py-4 mt-6 bg-[#0F172A] text-white rounded-2xl hover:bg-blue-600 flex justify-center items-center gap-3 text-sm font-normal">{isSaving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}{editId ? "Update Question" : "Final Submit All Draft"}</button>
+            <button disabled={isSaving} className="w-full py-4 mt-6 bg-[#0F172A] text-white rounded-2xl hover:bg-blue-600 flex justify-center items-center gap-3 text-sm font-semibold">{isSaving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}{editId ? "Update Question" : "Final Submit All Draft"}</button>
           </form>
         </div>
       )}

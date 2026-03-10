@@ -125,6 +125,21 @@ const createWithRetry = async (baseDoc, retries = 3) => {
   throw new Error("CREATE_FAILED");
 };
 
+const normalizeImages = (value, limit = 5) => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((v) => String(v || "").trim())
+    .filter(Boolean)
+    .slice(0, limit);
+};
+
+const normalizeOptionImages = (value) => ({
+  A: normalizeImages(value?.A),
+  B: normalizeImages(value?.B),
+  C: normalizeImages(value?.C),
+  D: normalizeImages(value?.D),
+});
+
 exports.getNextQuestionBankId = async (req, res) => {
   try {
     const nextId = await nextQuestionBankId();
@@ -212,6 +227,9 @@ exports.upsertQuestionBank = async (req, res) => {
       optionD,
       correctOption,
       explanationText = "",
+      questionImages,
+      optionImages,
+      explanationImages,
       status = "ACTIVE",
     } = req.body;
 
@@ -268,6 +286,9 @@ exports.upsertQuestionBank = async (req, res) => {
       optionD: String(optionD || "").trim(),
       correctOption: normalizedCorrect,
       explanationText: String(explanationText || "").trim(),
+      questionImages: normalizeImages(questionImages),
+      optionImages: normalizeOptionImages(optionImages),
+      explanationImages: normalizeImages(explanationImages),
       topicName: normalizedTopicName || undefined,
       subTopicName: normalizedSubTopicName || undefined,
       status: String(status || "").toUpperCase() === "INACTIVE" ? "INACTIVE" : "ACTIVE",

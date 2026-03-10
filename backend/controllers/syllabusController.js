@@ -168,6 +168,117 @@ exports.upsertSyllabus = async (req, res) => {
   }
 };
 
+const parseSyllabusNumber = (syllabusId) => {
+  const raw = String(syllabusId || "").toUpperCase().trim();
+  const num = parseInt(raw.replace("SYLLABUS-", ""), 10);
+  return Number.isFinite(num) ? num : 0;
+};
+
+const formatSyllabusId = (num) => `SYLLABUS-${String(num).padStart(5, "0")}`;
+
+exports.bulkCreateSyllabus = async (req, res) => {
+  try {
+    const { examId, categoryId, examStage, subjects = [], status = "ACTIVE" } = req.body;
+
+    if (!examId || !mongoose.isValidObjectId(examId)) {
+      return res.status(400).json({ success: false, message: "VALID EXAM REQUIRED" });
+    }
+
+    const selectedExam = await Exam.findById(examId).select("examName examCode");
+    if (!selectedExam) {
+      return res.status(404).json({ success: false, message: "EXAM NOT FOUND" });
+    }
+
+    let selectedCategory = null;
+    if (categoryId && mongoose.isValidObjectId(categoryId)) {
+      selectedCategory = await Category.findById(categoryId).select("catId catName examName examCode examStage examStages");
+      if (!selectedCategory) {
+        return res.status(404).json({ success: false, message: "CATEGORY NOT FOUND" });
+      }
+      if (String(selectedCategory.examCode || "").toUpperCase() !== String(selectedExam.examCode || "").toUpperCase()) {
+        return res.status(400).json({ success: false, message: "CATEGORY DOES NOT BELONG TO EXAM" });
+      }
+    }
+
+    const availableStages = Array.from(
+      new Set(
+        [ ...(Array.isArray(selectedCategory?.examStages) ? selectedCategory.examStages : []), selectedCategory?.examStage ]
+          .map((s) => String(s || "").trim().toUpperCase())
+          .filter(Boolean)
+      )
+    );
+
+    const normalizedExamStage = String(examStage || "").trim().toUpperCase();
+    if (!normalizedExamStage) {
+      return res.status(400).json({ success: false, message: "EXAM STAGE REQUIRED" });
+    }
+    if (availableStages.length && !availableStages.includes(normalizedExamStage)) {
+      return res.status(400).json({ success: false, message: "INVALID EXAM STAGE FOR CATEGORY" });
+    }
+
+    const cleanSubjects = Array.isArray(subjects) ? subjects : [];
+    if (cleanSubjects.length === 0) {
+      return res.status(400).json({ success: false, message: "AT LEAST ONE SUBJECT REQUIRED" });
+    }
+
+    const targetQuery = {
+      examCode: String(selectedExam.examCode || "").toUpperCase(),
+      catId: String(selectedCategory?.catId || "").toUpperCase(),
+      examStage: normalizedExamStage,
+    };
+
+    const targetAlreadyExists = await Syllabus.exists(targetQuery);
+    if (targetAlreadyExists) {
+      return res.status(409).json({ success: false, message: "TARGET STAGE ALREADY HAS SYLLABUS" });
+    }
+
+    const last = await Syllabus.findOne().sort({ syllabusId: -1 }).select("syllabusId").lean();
+    let nextNum = parseSyllabusNumber(last?.syllabusId) + 1;
+
+    const docs = [];
+    for (let i = 0; i < cleanSubjects.length; i++) {
+      const row = cleanSubjects[i] || {};
+      const subjectName = String(row.subjectName || "").trim().toUpperCase();
+      if (!subjectName) {
+        return res.status(400).json({ success: false, message: `SUBJECT NAME REQUIRED (ROW ${i + 1})` });
+      }
+
+      const cleanTopics = (Array.isArray(row.topics) ? row.topics : [])
+        .map((t) => ({
+          topicName: String(t?.topicName || "").trim().toUpperCase(),
+          subTopics: (Array.isArray(t?.subTopics) ? t.subTopics : [])
+            .map((s) => String(s || "").trim().toUpperCase())
+            .filter(Boolean),
+        }))
+        .filter((t) => t.topicName);
+
+      if (cleanTopics.length === 0) {
+        return res.status(400).json({ success: false, message: `AT LEAST ONE TOPIC REQUIRED (ROW ${i + 1})` });
+      }
+
+      docs.push({
+        syllabusId: formatSyllabusId(nextNum++),
+        examName: selectedExam.examName,
+        examCode: selectedExam.examCode,
+        examStage: normalizedExamStage,
+        catId: selectedCategory?.catId || "",
+        catName: selectedCategory?.catName || "",
+        subjectName,
+        topics: cleanTopics,
+        status: String(status).toUpperCase() === "INACTIVE" ? "INACTIVE" : "ACTIVE",
+      });
+    }
+
+    const created = await Syllabus.insertMany(docs);
+    return res.status(201).json({ success: true, count: created.length, data: created });
+  } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(409).json({ success: false, message: "SYLLABUS ID ALREADY EXISTS" });
+    }
+    return res.status(500).json({ success: false, message: error.message || "DATABASE ERROR" });
+  }
+};
+
 exports.deleteSyllabus = async (req, res) => {
   try {
     await Syllabus.findByIdAndDelete(req.params.id);

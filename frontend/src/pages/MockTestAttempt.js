@@ -82,6 +82,20 @@ const MockTestAttempt = () => {
   const currentQuestion = questions[currentIndex];
   const selected = currentQuestion ? answers[currentQuestion._id] || "" : "";
 
+  const renderImages = (images) => {
+    const list = Array.isArray(images) ? images.filter(Boolean) : [];
+    if (!list.length) return null;
+    return (
+      <div className="flex flex-wrap gap-2 mt-2">
+        {list.map((img, idx) => (
+          <div key={`${img}-${idx}`} className="w-24 h-24 rounded-xl overflow-hidden border border-slate-200 bg-white">
+            <img src={img} alt="question" className="w-full h-full object-cover" />
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   const saveCurrentAnswer = () => {
     if (!currentQuestion) return;
     if (!answers[currentQuestion._id]) return;
@@ -148,6 +162,7 @@ const MockTestAttempt = () => {
             <p className="text-sm font-semibold text-slate-900 mb-3">
               Q{currentIndex + 1}. {currentQuestion.questionText}
             </p>
+            {renderImages(currentQuestion.questionImages)}
 
             <div className="space-y-2">
               {[
@@ -171,9 +186,12 @@ const MockTestAttempt = () => {
                       setAnswers((prev) => ({ ...prev, [currentQuestion._id]: e.target.value }))
                     }
                   />
-                  <span className="text-sm font-semibold text-slate-800">
-                    {opt.key}. {opt.val}
-                  </span>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold text-slate-800">
+                      {opt.key}. {opt.val}
+                    </span>
+                    {renderImages(currentQuestion.optionImages?.[opt.key])}
+                  </div>
                 </label>
               ))}
             </div>
@@ -270,16 +288,19 @@ const MockTestAttempt = () => {
               return (
                 <div key={q._id} className="bg-white border border-slate-200 rounded-2xl p-4">
                   <p className="text-sm font-semibold text-slate-900">Q{idx + 1}. {q.questionText}</p>
+                  {renderImages(q.questionImages)}
                   <div className={`mt-3 p-3 rounded-xl border ${ok ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}`}>
                     <p className="text-sm font-semibold">Your Answer: {ans || "Not Answered"} | Correct: {q.correctOption}</p>
                     <p className={`text-sm font-semibold mt-1 ${score.perQuestion[q._id] < 0 ? "text-red-700" : "text-emerald-700"}`}>
                       Question Score: {score.perQuestion[q._id] > 0 ? `+${score.perQuestion[q._id]}` : score.perQuestion[q._id]}
                     </p>
+                    {renderImages(q.optionImages?.[q.correctOption])}
                     {!ok && (
                       <p className="text-sm font-semibold text-slate-700 mt-1">
                         Explanation: {q.explanationText || "No explanation available."}
                       </p>
                     )}
+                    {renderImages(q.explanationImages)}
                   </div>
                 </div>
               );

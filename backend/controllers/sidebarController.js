@@ -11,7 +11,7 @@ exports.getSidebarStructure = async (req, res) => {
     // 2. Fetch all categories from Category Master
     const allCategories = await Category.find().lean();
     const allSyllabus = await Syllabus.find({ status: "ACTIVE" })
-      .select("syllabusId subjectName examCode catId")
+      .select("syllabusId subjectName examCode catId examStage")
       .lean();
     const selectedMockSets = await MockTest.find({
       status: "ACTIVE",
