@@ -11,12 +11,12 @@ const isNoCategoryValue = (value) => {
 };
 
 const nextQuestionBankId = async () => {
-  const rows = await QuestionBank.find().select("questionBankId").lean();
+  const rows = await QuestionBank.find().select("questionSetId").lean();
   const maxNum = rows.reduce((acc, item) => {
-    const n = parseInt(String(item?.questionBankId || "").replace("QSBANK", ""), 10);
+    const n = parseInt(String(item?.questionSetId || "").replace("QSET", ""), 10);
     return Number.isNaN(n) ? acc : Math.max(acc, n);
   }, 0);
-  return `QSBANK${maxNum + 1}`;
+  return `QSET${maxNum + 1}`;
 };
 
 const resolveExam = async (examInput) => {
@@ -63,24 +63,6 @@ const buildHierarchyPayload = async ({ examMasterId, examCategoryId, subjectId, 
   const selectedSubject = await resolveSubject(subjectId, selectedExam.examCode, selectedCategory?.catId);
   if (!selectedSubject) throw new Error("SUBJECT_NOT_FOUND");
 
-  if (selectedCategory && (
-    String(selectedCategory.examCode || "").toUpperCase() !==
-    String(selectedExam.examCode || "").toUpperCase()
-  )) {
-    throw new Error("CATEGORY_EXAM_MISMATCH");
-  }
-
-  if (
-    String(selectedSubject.examCode || "").toUpperCase() !==
-      String(selectedExam.examCode || "").toUpperCase() || (
-      selectedCategory
-        ? String(selectedSubject.catId || "").toUpperCase() !== String(selectedCategory.catId || "").toUpperCase()
-        : !isNoCategoryValue(selectedSubject.catId)
-    )
-  ) {
-    throw new Error("SUBJECT_CATEGORY_MISMATCH");
-  }
-
   const availableStages = Array.from(
     new Set(
       [ ...(Array.isArray(selectedCategory?.examStages) ? selectedCategory.examStages : []), selectedCategory?.examStage ]
@@ -99,30 +81,44 @@ const buildHierarchyPayload = async ({ examMasterId, examCategoryId, subjectId, 
     subjectId: String(selectedSubject.syllabusId || "").toUpperCase(),
     examName: selectedExam.examName,
     examCode: selectedExam.examCode,
-    examStage: normalizedExamStage || availableStages[0] || undefined,
+    examStage: normalizedExamStage || availableStages[0] || "",
     categoryName: selectedCategory?.catName || NO_CATEGORY_NAME,
     categoryCode: selectedCategory?.catId || NO_CATEGORY_ID,
     subjectName: selectedSubject.subjectName,
-    subjectTopics: selectedSubject.topics || [],
   };
 };
 
-const createWithRetry = async (baseDoc, retries = 3) => {
-  let attempts = 0;
-  while (attempts <= retries) {
-    try {
-      return await QuestionBank.create(baseDoc);
-    } catch (error) {
-      if (error?.code === 11000 && attempts < retries) {
-        const newId = await nextQuestionBankId();
-        baseDoc.questionBankId = String(newId).toUpperCase();
-        attempts += 1;
-        continue;
-      }
-      throw error;
-    }
+const buildOptionalHierarchyPayload = async ({ examMasterId, examCategoryId, subjectId, examStage }) => {
+  const hasAny = [examMasterId, examCategoryId, subjectId, examStage].some((v) => String(v || "").trim());
+  if (!hasAny) {
+    return {
+      examMasterId: "",
+      examCategoryId: "",
+      subjectId: "",
+      examName: "",
+      examCode: "",
+      examStage: "",
+      categoryName: "",
+      categoryCode: "",
+      subjectName: "",
+    };
   }
-  throw new Error("CREATE_FAILED");
+
+  try {
+    return await buildHierarchyPayload({ examMasterId, examCategoryId, subjectId, examStage });
+  } catch {
+    return {
+      examMasterId: String(examMasterId || "").trim().toUpperCase(),
+      examCategoryId: String(examCategoryId || "").trim().toUpperCase(),
+      subjectId: String(subjectId || "").trim().toUpperCase(),
+      examName: "",
+      examCode: String(examMasterId || "").trim().toUpperCase(),
+      examStage: String(examStage || "").trim().toUpperCase(),
+      categoryName: "",
+      categoryCode: String(examCategoryId || "").trim().toUpperCase(),
+      subjectName: "",
+    };
+  }
 };
 
 const normalizeImages = (value, limit = 5) => {
@@ -140,6 +136,12 @@ const normalizeOptionImages = (value) => ({
   D: normalizeImages(value?.D),
 });
 
+const toNumberOrNull = (value) => {
+  if (value === "" || value === null || value === undefined) return null;
+  const n = Number(value);
+  return Number.isNaN(n) ? null : n;
+};
+
 exports.getNextQuestionBankId = async (req, res) => {
   try {
     const nextId = await nextQuestionBankId();
@@ -151,7 +153,7 @@ exports.getNextQuestionBankId = async (req, res) => {
 
 exports.getQuestionBank = async (req, res) => {
   try {
-    const { examMasterId, examCategoryId, subjectId, examStage, topicName, subTopicName, status, marks, negativeMarks, page = 1, limit = 10, search = "" } = req.query;
+    const { examMasterId, examCategoryId, subjectId, examStage, topicName, subTopicName, status, page = 1, limit = 10, search = "" } = req.query;
     const filter = {};
     const toUpperList = (v) =>
       String(v || "")
@@ -172,13 +174,11 @@ exports.getQuestionBank = async (req, res) => {
     if (subTopicNames.length) filter.subTopicName = { $in: subTopicNames };
     if (String(status || "").toUpperCase() === "ACTIVE") filter.status = "ACTIVE";
     if (String(status || "").toUpperCase() === "INACTIVE") filter.status = "INACTIVE";
-    if (String(marks || "").trim() !== "") filter.marks = Number(marks);
-    if (String(negativeMarks || "").trim() !== "") filter.negativeMarks = Number(negativeMarks);
 
     if (String(search || "").trim()) {
       filter.$or = [
-        { questionBankId: { $regex: search, $options: "i" } },
-        { questionText: { $regex: search, $options: "i" } },
+        { questionSetId: { $regex: search, $options: "i" } },
+        { examName: { $regex: search, $options: "i" } },
         { subjectName: { $regex: search, $options: "i" } },
       ];
     }
@@ -207,121 +207,76 @@ exports.getQuestionBank = async (req, res) => {
   }
 };
 
+exports.getQuestionBankById = async (req, res) => {
+  try {
+    const row = await QuestionBank.findById(req.params.id).lean();
+    if (!row) return res.status(404).json({ success: false, message: "QUESTION SET NOT FOUND" });
+    res.json({ success: true, data: row });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message || "DATABASE ERROR" });
+  }
+};
+
 exports.upsertQuestionBank = async (req, res) => {
   try {
     const {
       id,
-      questionBankId,
+      questionSetId,
       examMasterId,
       examCategoryId,
       subjectId,
       examStage,
       topicName,
       subTopicName,
-      marks = 1,
-      negativeMarks = 0,
-      questionText,
-      optionA,
-      optionB,
-      optionC,
-      optionD,
-      correctOption,
-      explanationText = "",
-      questionImages,
-      optionImages,
-      explanationImages,
       status = "ACTIVE",
+      questions,
     } = req.body;
 
-    if (!examMasterId) return res.status(400).json({ success: false, message: "VALID EXAM REQUIRED" });
-    if (!subjectId) return res.status(400).json({ success: false, message: "VALID SUBJECT REQUIRED" });
-    if (!String(questionText || "").trim()) {
-      return res.status(400).json({ success: false, message: "QUESTION TEXT REQUIRED" });
-    }
-
-    const normalizedCorrect = String(correctOption || "").toUpperCase();
-    if (!["A", "B", "C", "D"].includes(normalizedCorrect)) {
-      return res.status(400).json({ success: false, message: "VALID CORRECT OPTION REQUIRED" });
-    }
-    if (
-      !String(optionA || "").trim() ||
-      !String(optionB || "").trim() ||
-      !String(optionC || "").trim() ||
-      !String(optionD || "").trim()
-    ) {
-      return res.status(400).json({ success: false, message: "ALL OPTIONS REQUIRED" });
-    }
-
-    const hierarchy = await buildHierarchyPayload({ examMasterId, examCategoryId, subjectId, examStage });
+    const hierarchy = await buildOptionalHierarchyPayload({ examMasterId, examCategoryId, subjectId, examStage });
     const normalizedTopicName = String(topicName || "").trim().toUpperCase();
     const normalizedSubTopicName = String(subTopicName || "").trim().toUpperCase();
-    if (normalizedSubTopicName && !normalizedTopicName) {
-      return res.status(400).json({ success: false, message: "TOPIC REQUIRED WHEN SUBTOPIC SELECTED" });
-    }
-    if (normalizedTopicName || normalizedSubTopicName) {
-      const topicRows = Array.isArray(hierarchy.subjectTopics) ? hierarchy.subjectTopics : [];
-      const foundTopic = topicRows.find(
-        (t) => String(t?.topicName || "").trim().toUpperCase() === normalizedTopicName
-      );
-      if (normalizedTopicName && !foundTopic) {
-        return res.status(400).json({ success: false, message: "INVALID TOPIC FOR SUBJECT" });
-      }
-      if (normalizedSubTopicName) {
-        const validSubTopics = (Array.isArray(foundTopic?.subTopics) ? foundTopic.subTopics : [])
-          .map((s) => String(s || "").trim().toUpperCase());
-        if (!validSubTopics.includes(normalizedSubTopicName)) {
-          return res.status(400).json({ success: false, message: "INVALID SUBTOPIC FOR TOPIC" });
-        }
-      }
-    }
+
+    const normalizedQuestions = (Array.isArray(questions) ? questions : []).map((q, idx) => ({
+      qNo: `Q${idx + 1}`,
+      marks: q?.marks ? toNumberOrNull(q.marks) : 0,
+      negativeMarks: q?.negativeMarks ? toNumberOrNull(q.negativeMarks) : 0,
+      questionText: String(q?.questionText || ""),
+      optionA: String(q?.optionA || ""),
+      optionB: String(q?.optionB || ""),
+      optionC: String(q?.optionC || ""),
+      optionD: String(q?.optionD || ""),
+      correctOption: ["A", "B", "C", "D"].includes(String(q?.correctOption || "").toUpperCase())
+        ? String(q?.correctOption || "").toUpperCase()
+        : "",
+      explanationText: String(q?.explanationText || ""),
+      questionImages: normalizeImages(q?.questionImages),
+      optionImages: normalizeOptionImages(q?.optionImages),
+      explanationImages: normalizeImages(q?.explanationImages),
+    }));
 
     const payload = {
       ...hierarchy,
-      marks: Number(marks) >= 0 ? Number(marks) : 1,
-      negativeMarks: Number(negativeMarks) >= 0 ? Number(negativeMarks) : 0,
-      questionText: String(questionText || "").trim(),
-      optionA: String(optionA || "").trim(),
-      optionB: String(optionB || "").trim(),
-      optionC: String(optionC || "").trim(),
-      optionD: String(optionD || "").trim(),
-      correctOption: normalizedCorrect,
-      explanationText: String(explanationText || "").trim(),
-      questionImages: normalizeImages(questionImages),
-      optionImages: normalizeOptionImages(optionImages),
-      explanationImages: normalizeImages(explanationImages),
-      topicName: normalizedTopicName || undefined,
-      subTopicName: normalizedSubTopicName || undefined,
+      topicName: normalizedTopicName || "",
+      subTopicName: normalizedSubTopicName || "",
       status: String(status || "").toUpperCase() === "INACTIVE" ? "INACTIVE" : "ACTIVE",
+      questions: normalizedQuestions,
     };
-    delete payload.subjectTopics;
 
     if (id) {
-      const updated = await QuestionBank.findByIdAndUpdate(id, { $set: payload }, { new: true });
-      if (!updated) return res.status(404).json({ success: false, message: "QUESTION NOT FOUND" });
+      const updated = await QuestionBank.findByIdAndUpdate(id, { $set: payload }, { returnDocument: 'after' });
+      if (!updated) return res.status(404).json({ success: false, message: "QUESTION SET NOT FOUND" });
       return res.json({ success: true, data: updated });
     }
 
-    const nextId = questionBankId || (await nextQuestionBankId());
-    const created = await createWithRetry({
-      questionBankId: String(nextId).toUpperCase(),
+    const nextId = questionSetId || (await nextQuestionBankId());
+    const created = await QuestionBank.create({
+      questionSetId: String(nextId).toUpperCase(),
       ...payload,
     });
     return res.status(201).json({ success: true, data: created });
   } catch (error) {
-    if (error?.message === "EXAM_NOT_FOUND") return res.status(404).json({ success: false, message: "EXAM NOT FOUND" });
-    if (error?.message === "CATEGORY_NOT_FOUND") return res.status(404).json({ success: false, message: "CATEGORY NOT FOUND" });
-    if (error?.message === "SUBJECT_NOT_FOUND") return res.status(404).json({ success: false, message: "SUBJECT NOT FOUND" });
-    if (error?.message === "CATEGORY_EXAM_MISMATCH") {
-      return res.status(400).json({ success: false, message: "CATEGORY DOES NOT BELONG TO EXAM" });
-    }
-    if (error?.message === "CATEGORY_STAGE_MISMATCH") {
-      return res.status(400).json({ success: false, message: "EXAM STAGE DOES NOT BELONG TO CATEGORY" });
-    }
-    if (error?.message === "SUBJECT_CATEGORY_MISMATCH") {
-      return res.status(400).json({ success: false, message: "SUBJECT DOES NOT BELONG TO CATEGORY" });
-    }
     if (error?.code === 11000) {
-      return res.status(409).json({ success: false, message: "QUESTION BANK ID ALREADY EXISTS" });
+      return res.status(409).json({ success: false, message: "QUESTION SET ID ALREADY EXISTS" });
     }
     return res.status(500).json({ success: false, message: error.message || "DATABASE ERROR" });
   }

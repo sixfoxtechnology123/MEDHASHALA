@@ -1,29 +1,16 @@
 const mongoose = require("mongoose");
 
-const questionBankSchema = new mongoose.Schema(
+const questionSchema = new mongoose.Schema(
   {
-    questionBankId: { type: String, unique: true, required: true },
-    examMasterId: { type: String, required: true, trim: true, uppercase: true },
-    examCategoryId: { type: String, required: true, trim: true, uppercase: true },
-    subjectId: { type: String, required: true, trim: true, uppercase: true },
-
-    examName: { type: String, required: true, trim: true, uppercase: true },
-    examCode: { type: String, required: true, trim: true, uppercase: true },
-    examStage: { type: String, trim: true, uppercase: true },
-    categoryName: { type: String, required: true, trim: true, uppercase: true },
-    categoryCode: { type: String, required: true, trim: true, uppercase: true },
-    subjectName: { type: String, required: true, trim: true, uppercase: true },
-    topicName: { type: String, trim: true, uppercase: true },
-    subTopicName: { type: String, trim: true, uppercase: true },
-
-    marks: { type: Number, default: 1, min: 0 },
-    negativeMarks: { type: Number, default: 0, min: 0 },
-    questionText: { type: String, required: true, trim: true },
-    optionA: { type: String, required: true, trim: true },
-    optionB: { type: String, required: true, trim: true },
-    optionC: { type: String, required: true, trim: true },
-    optionD: { type: String, required: true, trim: true },
-    correctOption: { type: String, enum: ["A", "B", "C", "D"], required: true },
+    qNo: { type: String, trim: true, uppercase: true },
+    marks: { type: Number, default: null },
+    negativeMarks: { type: Number, default: null },
+    questionText: { type: String, trim: true, default: "" },
+    optionA: { type: String, trim: true, default: "" },
+    optionB: { type: String, trim: true, default: "" },
+    optionC: { type: String, trim: true, default: "" },
+    optionD: { type: String, trim: true, default: "" },
+    correctOption: { type: String, enum: ["A", "B", "C", "D", ""], default: "" },
     explanationText: { type: String, trim: true, default: "" },
     questionImages: { type: [String], default: [] },
     optionImages: {
@@ -33,6 +20,24 @@ const questionBankSchema = new mongoose.Schema(
       D: { type: [String], default: [] },
     },
     explanationImages: { type: [String], default: [] },
+  },
+  { _id: false }
+);
+
+const questionBankSchema = new mongoose.Schema(
+  {
+    questionSetId: { type: String, unique: true, sparse: true, required: true },
+    examMasterId: { type: String, trim: true, uppercase: true, default: "" },
+    examCategoryId: { type: String, trim: true, uppercase: true, default: "" },
+    subjectId: { type: String, trim: true, uppercase: true, default: "" },
+    examName: { type: String, trim: true, uppercase: true, default: "" },
+    examCode: { type: String, trim: true, uppercase: true, default: "" },
+    examStage: { type: String, trim: true, uppercase: true, default: "" },
+    categoryName: { type: String, trim: true, uppercase: true, default: "" },
+    categoryCode: { type: String, trim: true, uppercase: true, default: "" },
+    subjectName: { type: String, trim: true, uppercase: true, default: "" },
+    topicName: { type: String, trim: true, uppercase: true, default: "" },
+    subTopicName: { type: String, trim: true, uppercase: true, default: "" },
     status: {
       type: String,
       enum: ["ACTIVE", "INACTIVE"],
@@ -40,6 +45,7 @@ const questionBankSchema = new mongoose.Schema(
       uppercase: true,
       trim: true,
     },
+    questions: { type: [questionSchema], default: [] },
   },
   { timestamps: true }
 );

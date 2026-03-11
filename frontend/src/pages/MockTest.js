@@ -1,6 +1,6 @@
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Edit, Eye, Loader2, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
+import { Edit, FileText, Loader2, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 import axios from "../api/axios";
 
@@ -43,14 +43,14 @@ const QuestionInlineForm = ({ exams, categories, subjects, onSaved }) => {
   const [baseForm, setBaseForm] = useState({ examMasterId: "", examCategoryId: "", subjectId: "" });
   const [questionForm, setQuestionForm] = useState({
     questionBankId: "",
-    marks: 1,
-    negativeMarks: 0,
+    marks: "",
+    negativeMarks: "",
     questionText: "",
     optionA: "",
     optionB: "",
     optionC: "",
     optionD: "",
-    correctOption: "A",
+    correctOption: "",
     explanationText: "",
     status: "ACTIVE",
   });
@@ -90,9 +90,6 @@ const QuestionInlineForm = ({ exams, categories, subjects, onSaved }) => {
   }, []);
 
   const addDraft = () => {
-    if (!baseForm.examMasterId || !baseForm.subjectId) return toastErrorOnce("SELECT EXAM, SUBJECT");
-    if (hasCategoriesForExam && !baseForm.examCategoryId) return toastErrorOnce("SELECT CATEGORY");
-    if (!questionForm.questionText || !questionForm.optionA || !questionForm.optionB || !questionForm.optionC || !questionForm.optionD) return toastErrorOnce("FILL QUESTION AND OPTIONS");
     setDrafts((prev) => [...prev, { ...questionForm }]);
     setQuestionForm((prev) => ({
       ...prev,
@@ -102,7 +99,7 @@ const QuestionInlineForm = ({ exams, categories, subjects, onSaved }) => {
       optionB: "",
       optionC: "",
       optionD: "",
-      correctOption: "A",
+      correctOption: "",
       explanationText: "",
     }));
   };
@@ -136,8 +133,8 @@ const QuestionInlineForm = ({ exams, categories, subjects, onSaved }) => {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
         <div className="p-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-blue-700">{questionForm.questionBankId || "QSBANK..."}</div>
-        <input type="number" min="0" step="0.5" value={questionForm.marks} onChange={(e) => setQuestionForm((p) => ({ ...p, marks: Number(e.target.value) }))} placeholder="Marks" className="p-2 border border-slate-200 rounded-lg text-sm" />
-        <input type="number" min="0" step="0.25" value={questionForm.negativeMarks} onChange={(e) => setQuestionForm((p) => ({ ...p, negativeMarks: Number(e.target.value) }))} placeholder="Negative" className="p-2 border border-slate-200 rounded-lg text-sm" />
+        <input type="number" step="0.5" value={questionForm.marks} onChange={(e) => setQuestionForm((p) => ({ ...p, marks: e.target.value }))} placeholder="Marks" className="p-2 border border-slate-200 rounded-lg text-sm" />
+        <input type="number" step="0.25" value={questionForm.negativeMarks} onChange={(e) => setQuestionForm((p) => ({ ...p, negativeMarks: e.target.value }))} placeholder="Negative" className="p-2 border border-slate-200 rounded-lg text-sm" />
       </div>
       <textarea value={questionForm.questionText} onChange={(e) => setQuestionForm((p) => ({ ...p, questionText: e.target.value }))} placeholder="Question" className="w-full p-2 border border-slate-200 rounded-lg text-sm" />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -163,6 +160,10 @@ const MockTest = () => {
   const [saving, setSaving] = useState(false);
   const [showFormPage, setShowFormPage] = useState(false);
   const [showQuickQuestionForm, setShowQuickQuestionForm] = useState(false);
+  const [showPaperView, setShowPaperView] = useState(false);
+  const [paperSet, setPaperSet] = useState(null);
+  const [paperQuestions, setPaperQuestions] = useState([]);
+  const [paperLoading, setPaperLoading] = useState(false);
   const [expandedSetIds, setExpandedSetIds] = useState([]);
   const [filters, setFilters] = useState({ examMasterId: "", examStage: "", examCategoryId: "", subjectId: "" });
   const [pagination, setPagination] = useState({ page: 1, limit: 10, totalPages: 1 });
@@ -188,6 +189,7 @@ const MockTest = () => {
   });
   const [questionFilter, setQuestionFilter] = useState({ marks: "", negativeMarks: "" });
   const [showOnlySetQuestions, setShowOnlySetQuestions] = useState(true);
+  const richViewClass = "text-sm text-slate-800 leading-relaxed [&_table]:w-full [&_table]:border-collapse [&_table]:border [&_th]:border [&_td]:border [&_th]:p-1.5 [&_td]:p-1.5 [&_th]:bg-slate-100";
 
   const hasSetStage = useMemo(
     () => sets.some((row) => String(row.examStage || "").trim() || (Array.isArray(row.examStages) && row.examStages.length)),
@@ -403,6 +405,7 @@ const MockTest = () => {
       const res = await axios.get(`/master/mock-test/set/${id}`);
       const row = res.data?.data;
       if (!row) return;
+      setShowPaperView(false);
       setEditId(canEdit ? row._id : "");
       setIsViewOnly(!canEdit);
       setShowOnlySetQuestions(true);
@@ -429,6 +432,24 @@ const MockTest = () => {
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch {
       toastErrorOnce("FAILED TO LOAD SET");
+    }
+  };
+
+  const openPaperView = async (id) => {
+    setPaperLoading(true);
+    try {
+      const res = await axios.get(`/master/mock-test/set/${id}`);
+      const row = res.data?.data;
+      if (!row) return;
+      setPaperSet(row);
+      setPaperQuestions(Array.isArray(row.questionDetails) ? row.questionDetails : []);
+      setShowPaperView(true);
+      setShowFormPage(false);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch {
+      toastErrorOnce("FAILED TO LOAD SET");
+    } finally {
+      setPaperLoading(false);
     }
   };
 
@@ -545,6 +566,89 @@ const MockTest = () => {
 
       {showQuickQuestionForm && <section className="px-3 pb-3"><QuestionInlineForm exams={exams} categories={categories} subjects={subjects} onSaved={fetchQuestionBankRows} /></section>}
 
+      {showPaperView && (
+      <section className="px-3 pb-3">
+        <div className="bg-white rounded-2xl border border-sky-100 shadow-sm p-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">Question Paper View</h2>
+              <p className="text-xs text-slate-500">Set ID: <span className="font-semibold text-blue-700">{paperSet?.questionSetId || "--"}</span></p>
+            </div>
+            <button type="button" onClick={() => { setShowPaperView(false); setPaperSet(null); setPaperQuestions([]); }} className="px-3 py-1.5 text-xs rounded-lg bg-slate-100 text-slate-700">Back</button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-slate-600">
+            <div><span className="font-semibold text-slate-700">Exam:</span> {paperSet?.examName || "---"}</div>
+            <div><span className="font-semibold text-slate-700">Category:</span> {paperSet?.categoryName || "---"}</div>
+            <div><span className="font-semibold text-slate-700">Subject:</span> {paperSet?.subjectName || "---"}</div>
+          </div>
+
+          {paperLoading ? (
+            <div className="p-10 text-center text-slate-300 font-semibold">Loading...</div>
+          ) : (
+            <div className="space-y-4">
+              {paperQuestions.map((q, idx) => (
+                <div key={q._id || q.questionBankId || idx} className="border border-slate-200 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <div className="font-semibold text-slate-800">Q{idx + 1}</div>
+                    <div>Marks: <span className="font-semibold text-slate-800">{q.marks ?? "--"}</span> | Neg: <span className="font-semibold text-slate-800">{q.negativeMarks ?? "--"}</span></div>
+                  </div>
+
+                  <div className={richViewClass}>
+                    {q.questionText ? <div dangerouslySetInnerHTML={{ __html: q.questionText }} /> : <span className="text-slate-400">---</span>}
+                  </div>
+
+                  {(Array.isArray(q.questionImages) ? q.questionImages : []).length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {q.questionImages.map((img, i) => (
+                        <img key={`qimg-${idx}-${i}`} src={img} alt="question" className="h-24 w-24 object-cover rounded-lg border border-slate-200" />
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    {["A", "B", "C", "D"].map((opt) => (
+                      <div key={`${idx}-${opt}`} className="rounded-xl border border-slate-100 p-3">
+                        <div className="text-xs font-semibold text-slate-600 mb-1">Option {opt}</div>
+                        <div className={richViewClass}>
+                          {q[`option${opt}`] ? <div dangerouslySetInnerHTML={{ __html: q[`option${opt}`] }} /> : <span className="text-slate-400">---</span>}
+                        </div>
+                        {(Array.isArray(q.optionImages?.[opt]) ? q.optionImages?.[opt] : []).length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {q.optionImages[opt].map((img, i) => (
+                              <img key={`opt-${idx}-${opt}-${i}`} src={img} alt={`option-${opt}`} className="h-20 w-20 object-cover rounded-lg border border-slate-200" />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="text-sm font-semibold text-emerald-700">
+                    Correct Answer: <span className="text-slate-900">{q.correctOption || "--"}</span>
+                  </div>
+
+                  <div className={richViewClass}>
+                    <div className="text-xs font-semibold text-slate-600 mb-1">Explanation</div>
+                    {q.explanationText ? <div dangerouslySetInnerHTML={{ __html: q.explanationText }} /> : <span className="text-slate-400">---</span>}
+                  </div>
+
+                  {(Array.isArray(q.explanationImages) ? q.explanationImages : []).length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {q.explanationImages.map((img, i) => (
+                        <img key={`exp-${idx}-${i}`} src={img} alt="explanation" className="h-24 w-24 object-cover rounded-lg border border-slate-200" />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {paperQuestions.length === 0 && <div className="p-10 text-center text-slate-300 font-semibold">No questions in this set.</div>}
+            </div>
+          )}
+        </div>
+      </section>
+      )}
+
       {showFormPage && (
       <section className="px-3 pb-3">
         <form onSubmit={submit} className="bg-white rounded-2xl border border-sky-100 shadow-sm p-4 space-y-3">
@@ -574,7 +678,7 @@ const MockTest = () => {
       </section>
       )}
 
-      {!showFormPage && (
+      {!showFormPage && !showPaperView && (
       <section className="px-3 pb-4 bg-white rounded-[12px] border border-slate-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
@@ -591,7 +695,7 @@ const MockTest = () => {
                     <td className="p-2 text-xs font-normal">{row.subjectName}</td>
                     <td className="p-2 text-xs font-normal">{row.status}</td>
                     <td className="p-2 text-xs font-semibold">{row.isSelectedForAttempt ? <button onClick={() => selectForStudent(row._id, false)} className="px-3 py-1 rounded-full bg-emerald-500 text-white hover:bg-red-500 text-[11px]">Visible</button> : <button onClick={() => selectForStudent(row._id, true)} className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 hover:bg-blue-600 hover:text-white text-[11px] border border-slate-200">Hidden</button>}</td>
-                    <td className="p-2 flex justify-center gap-2"><button onClick={() => setExpandedSetIds((prev) => (prev.includes(row._id) ? prev.filter((id) => id !== row._id) : [...prev, row._id]))} className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[11px]">Details</button><button onClick={() => handleViewOrEdit(row._id, false)} className="p-2 bg-slate-100 text-slate-600 rounded-xl"><Eye size={16} /></button><button onClick={() => handleViewOrEdit(row._id, true)} className="p-2 bg-blue-50 text-blue-600 rounded-xl"><Edit size={16} /></button><button onClick={() => removeSet(row._id)} className="p-2 bg-red-50 text-red-400 rounded-xl"><Trash2 size={16} /></button></td>
+                    <td className="p-2 flex justify-center gap-2"><button onClick={() => setExpandedSetIds((prev) => (prev.includes(row._id) ? prev.filter((id) => id !== row._id) : [...prev, row._id]))} className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[11px]">Details</button><button onClick={() => openPaperView(row._id)} className="p-2 bg-slate-100 text-slate-600 rounded-xl"><FileText size={16} /></button><button onClick={() => handleViewOrEdit(row._id, true)} className="p-2 bg-blue-50 text-blue-600 rounded-xl"><Edit size={16} /></button><button onClick={() => removeSet(row._id)} className="p-2 bg-red-50 text-red-400 rounded-xl"><Trash2 size={16} /></button></td>
                   </tr>
                   {expandedSetIds.includes(row._id) && <tr className="bg-slate-50/70">
                     <td colSpan={hasSetStage ? 9 : 8} className="p-2">
