@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import axios from "../api/axios";
 
@@ -14,6 +14,17 @@ const MockTestAttempt = () => {
   const [error, setError] = useState("");
   const [elapsedSec, setElapsedSec] = useState(0);
   const [activeSet, setActiveSet] = useState(null);
+  const mathRef = useRef(null);
+
+  const typesetMath = (root) => {
+    if (!root) return;
+    if (!window.MathJax || !window.MathJax.typesetPromise) {
+      setTimeout(() => typesetMath(root), 200);
+      return;
+    }
+    if (window.MathJax.typesetClear) window.MathJax.typesetClear([root]);
+    window.MathJax.typesetPromise([root]);
+  };
 
   useEffect(() => {
     const loadQuestions = async () => {
@@ -48,6 +59,10 @@ const MockTestAttempt = () => {
     }, 1000);
     return () => clearInterval(timer);
   }, [submitted, loading]);
+
+  useEffect(() => {
+    typesetMath(mathRef.current);
+  }, [currentIndex, questions, submitted, loading]);
 
   const score = useMemo(() => {
     let correct = 0;
@@ -142,7 +157,7 @@ const MockTestAttempt = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-2">
+    <div className="max-w-7xl mx-auto p-2" ref={mathRef}>
       <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-3 flex items-center justify-between sticky top-0 z-20">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Mock Test Attempt</h1>
@@ -159,7 +174,7 @@ const MockTestAttempt = () => {
       {!submitted ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="md:col-span-2 bg-white border border-slate-200 rounded-2xl p-4">
-            <p className="text-sm font-semibold text-slate-900 mb-3">
+            <p className="text-sm font-semibold text-slate-900 mb-3 whitespace-pre-wrap">
               Q{currentIndex + 1}. {currentQuestion.questionText}
             </p>
             {renderImages(currentQuestion.questionImages)}
@@ -187,7 +202,7 @@ const MockTestAttempt = () => {
                     }
                   />
                   <div className="flex flex-col">
-                    <span className="text-sm font-semibold text-slate-800">
+                    <span className="text-sm font-semibold text-slate-800 whitespace-pre-wrap">
                       {opt.key}. {opt.val}
                     </span>
                     {renderImages(currentQuestion.optionImages?.[opt.key])}
@@ -287,7 +302,7 @@ const MockTestAttempt = () => {
               const ok = ans === q.correctOption;
               return (
                 <div key={q._id} className="bg-white border border-slate-200 rounded-2xl p-4">
-                  <p className="text-sm font-semibold text-slate-900">Q{idx + 1}. {q.questionText}</p>
+                  <p className="text-sm font-semibold text-slate-900 whitespace-pre-wrap">Q{idx + 1}. {q.questionText}</p>
                   {renderImages(q.questionImages)}
                   <div className={`mt-3 p-3 rounded-xl border ${ok ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}`}>
                     <p className="text-sm font-semibold">Your Answer: {ans || "Not Answered"} | Correct: {q.correctOption}</p>
@@ -296,7 +311,7 @@ const MockTestAttempt = () => {
                     </p>
                     {renderImages(q.optionImages?.[q.correctOption])}
                     {!ok && (
-                      <p className="text-sm font-semibold text-slate-700 mt-1">
+                      <p className="text-sm font-semibold text-slate-700 mt-1 whitespace-pre-wrap">
                         Explanation: {q.explanationText || "No explanation available."}
                       </p>
                     )}

@@ -113,23 +113,85 @@ const toUpperList = (value) =>
     )
   );
 
+const makeQuestionId = (setId, qNo) =>
+  `${String(setId || "").toUpperCase()}::${String(qNo || "").toUpperCase()}`;
+
+const parseQuestionId = (id) => {
+  const parts = String(id || "").trim().toUpperCase().split("::");
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return null;
+  return { setId: parts[0], qNo: parts[1] };
+};
+
+const flattenQuestionSet = (set) =>
+  (Array.isArray(set.questions) ? set.questions : []).map((q, idx) => {
+    const qNo = String(q?.qNo || `Q${idx + 1}`).toUpperCase();
+    return {
+      questionBankId: makeQuestionId(set.questionSetId, qNo),
+      questionSetId: set.questionSetId,
+      qNo,
+      marks: q?.marks ?? null,
+      negativeMarks: q?.negativeMarks ?? null,
+      questionText: q?.questionText || "",
+      optionA: q?.optionA || "",
+      optionB: q?.optionB || "",
+      optionC: q?.optionC || "",
+      optionD: q?.optionD || "",
+      correctOption: q?.correctOption || "",
+      explanationText: q?.explanationText || "",
+      questionImages: Array.isArray(q?.questionImages) ? q.questionImages : [],
+      optionImages: q?.optionImages || { A: [], B: [], C: [], D: [] },
+      explanationImages: Array.isArray(q?.explanationImages) ? q.explanationImages : [],
+      examMasterId: set.examMasterId,
+      examCategoryId: set.examCategoryId,
+      subjectId: set.subjectId,
+      examStage: set.examStage,
+      topicName: set.topicName,
+      subTopicName: set.subTopicName,
+      examName: set.examName,
+      categoryName: set.categoryName,
+      subjectName: set.subjectName,
+      status: set.status,
+      createdAt: set.createdAt,
+    };
+  });
+
+const resolveQuestionsByIds = async (questionIds) => {
+  const parsed = (Array.isArray(questionIds) ? questionIds : [])
+    .map(parseQuestionId)
+    .filter(Boolean);
+  if (!parsed.length) return [];
+
+  const bySet = new Map();
+  for (const { setId, qNo } of parsed) {
+    if (!bySet.has(setId)) bySet.set(setId, new Set());
+    bySet.get(setId).add(qNo);
+  }
+
+  const setIds = Array.from(bySet.keys());
+  const sets = await QuestionBank.find({ questionSetId: { $in: setIds } }).lean();
+  const result = [];
+  for (const set of sets) {
+    const want = bySet.get(String(set.questionSetId || "").toUpperCase());
+    if (!want) continue;
+    for (const q of flattenQuestionSet(set)) {
+      if (want.has(String(q.qNo || "").toUpperCase())) {
+        result.push(q);
+      }
+    }
+  }
+  return result;
+};
+
 const normalizeQuestionIds = async (questionIds) => {
   const ids = Array.isArray(questionIds) ? questionIds : [];
   const trimmed = Array.from(new Set(ids.map((item) => String(item || "").trim()).filter(Boolean)));
   if (!trimmed.length) return [];
 
-  const byBusinessIds = await QuestionBank.find({ questionBankId: { $in: trimmed.map((v) => v.toUpperCase()) } })
-    .select("questionBankId")
-    .lean();
-  const foundMap = new Set(byBusinessIds.map((q) => String(q.questionBankId).toUpperCase()));
+  const parsed = trimmed.map(parseQuestionId).filter(Boolean);
+  if (!parsed.length) return [];
 
-  if (foundMap.size === trimmed.length) {
-    return trimmed.map((v) => v.toUpperCase());
-  }
-
-  const byMongoIds = await QuestionBank.find({ _id: { $in: trimmed } }).select("questionBankId").lean();
-  const merged = new Set([...foundMap, ...byMongoIds.map((q) => String(q.questionBankId).toUpperCase())]);
-  return Array.from(merged);
+  const resolved = await resolveQuestionsByIds(trimmed);
+  return Array.from(new Set(resolved.map((q) => String(q.questionBankId).toUpperCase())));
 };
 
 const getAssignedQuestionIds = async ({ examMasterId, examCategoryId, subjectId }) => {
@@ -282,11 +344,7 @@ exports.getMockTestSetById = async (req, res) => {
     const row = await MockTest.findById(req.params.id).lean();
     if (!row) return res.status(404).json({ success: false, message: "QUESTION SET NOT FOUND" });
 
-    const questionDetails = await QuestionBank.find({
-      questionBankId: { $in: (row.questionIds || []).map((v) => String(v).toUpperCase()) },
-    })
-      .sort({ createdAt: 1 })
-      .lean();
+    const questionDetails = await resolveQuestionsByIds(row.questionIds || []);
 
     res.json({
       success: true,
@@ -316,7 +374,8 @@ exports.suggestQuestionsForSet = async (req, res) => {
       status: "ACTIVE",
     };
 
-    const allQuestions = await QuestionBank.find(baseFilter).sort({ createdAt: 1 }).lean();
+    const sets = await QuestionBank.find(baseFilter).sort({ createdAt: 1 }).lean();
+    const allQuestions = sets.flatMap((set) => flattenQuestionSet(set));
     if (!allQuestions.length) {
       return res.status(400).json({ success: false, message: "NO ACTIVE QUESTIONS FOUND IN QUESTION BANK" });
     }
@@ -395,17 +454,14 @@ exports.upsertMockTest = async (req, res) => {
       return res.status(400).json({ success: false, message: "SELECT AT LEAST ONE QUESTION" });
     }
 
-    const qbFilter = {
-      questionBankId: { $in: cleanedQuestionIds },
-      examMasterId: { $in: normalizedExamMasterIds },
-      subjectId: { $in: normalizedSubjectIds },
-    };
-    if (normalizedExamCategoryIds.length) qbFilter.examCategoryId = { $in: normalizedExamCategoryIds };
-    if (normalizedExamStages.length) qbFilter.examStage = { $in: normalizedExamStages };
-    if (normalizedTopicNames.length) qbFilter.topicName = { $in: normalizedTopicNames };
-    if (normalizedSubTopicNames.length) qbFilter.subTopicName = { $in: normalizedSubTopicNames };
-    const bankQuestions = await QuestionBank.find(qbFilter).select(
-      "questionBankId examMasterId examCategoryId subjectId examStage topicName subTopicName examName categoryName subjectName"
+    const bankQuestionsRaw = await resolveQuestionsByIds(cleanedQuestionIds);
+    const bankQuestions = bankQuestionsRaw.filter((q) =>
+      normalizedExamMasterIds.includes(String(q.examMasterId || "").toUpperCase()) &&
+      normalizedSubjectIds.includes(String(q.subjectId || "").toUpperCase()) &&
+      (!normalizedExamCategoryIds.length || normalizedExamCategoryIds.includes(String(q.examCategoryId || NO_CATEGORY_ID).toUpperCase())) &&
+      (!normalizedExamStages.length || normalizedExamStages.includes(String(q.examStage || "").toUpperCase())) &&
+      (!normalizedTopicNames.length || normalizedTopicNames.includes(String(q.topicName || "").toUpperCase())) &&
+      (!normalizedSubTopicNames.length || normalizedSubTopicNames.includes(String(q.subTopicName || "").toUpperCase()))
     );
 
     if (bankQuestions.length !== cleanedQuestionIds.length) {
@@ -544,12 +600,8 @@ exports.getAttemptQuestions = async (req, res) => {
       return res.json({ success: true, data: [], set: null });
     }
 
-    const rows = await QuestionBank.find({
-      questionBankId: { $in: (selectedSet.questionIds || []).map((v) => String(v).toUpperCase()) },
-      status: "ACTIVE",
-    })
-      .sort({ createdAt: 1 })
-      .lean();
+    const rows = (await resolveQuestionsByIds(selectedSet.questionIds || []))
+      .filter((q) => String(q.status || "").toUpperCase() === "ACTIVE");
 
     const questions = rows.map((q) => ({
       _id: q.questionBankId,

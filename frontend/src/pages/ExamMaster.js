@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   BookOpen,
   Search,
@@ -21,6 +22,7 @@ import {
 } from "../api/axios";
 
 const ExamMaster = () => {
+  const navigate = useNavigate();
   const [exams, setExams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -53,30 +55,13 @@ const ExamMaster = () => {
   }, []);
 
   // ADD NEW
-  const handleAddNew = async () => {
-    setEditId(null);
-    try {
-      const res = await getLatestExam();
-      setFormData({
-        examCode: res?.data?.nextId || "",
-        examName: "",
-        status: "ACTIVE",
-      });
-      setIsModalOpen(true);
-    } catch {
-      toast.error("ERROR GENERATING NEXT ID");
-    }
+  const handleAddNew = () => {
+    navigate("/dashboard/exam-master/new");
   };
 
   // EDIT
   const handleEdit = (item) => {
-    setEditId(item._id);
-    setFormData({
-      examCode: item.examCode,
-      examName: item.examName,
-      status: item.status || "ACTIVE",
-    });
-    setIsModalOpen(true);
+    navigate(`/dashboard/exam-master/${item._id}/edit`);
   };
 
 // SAVE / UPDATE

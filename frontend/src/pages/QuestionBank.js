@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Edit, Eye, Loader2, Plus, RefreshCw, Save, Search, Trash2, X } from "lucide-react";
 import toast from "react-hot-toast";
 import axios from "../api/axios";
@@ -48,6 +49,7 @@ const MathField = ({ fieldKey, label = "", value, onChange, onPaste, onFocus, in
   </div>
 );
 const QuestionBank = () => {
+  const navigate = useNavigate();
   const [exams, setExams] = useState([]);
   const [symbolField, setSymbolField] = useState("");
   const [questionSetId, setQuestionSetId] = useState("");
@@ -614,7 +616,7 @@ const addDraftQuestion = () => {
             <h1 className="text-lg font-semibold text-slate-900">Question Sets</h1>
             <div className="flex items-center gap-3">
               <button onClick={fetchRows} className="p-2 bg-slate-50 text-slate-900 rounded-2xl border border-slate-100"><RefreshCw size={20} className={loading ? "animate-spin" : ""} /></button>
-              <button onClick={openAddModal} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-2xl text-xs shadow-lg"><Plus size={14} strokeWidth={3} />Add Question Set</button>
+              <button onClick={() => navigate("/dashboard/question-bank/new")} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-2xl text-xs shadow-lg"><Plus size={14} strokeWidth={3} />Add Question Set</button>
             </div>
           </div>
 
@@ -671,7 +673,7 @@ const addDraftQuestion = () => {
               {loading ? <tr><td colSpan={(hasStageInRows ? 1 : 0) + (hasTopicInRows ? 2 : 0) + 7} className="p-20 text-center text-slate-300 font-semibold">Loading...</td></tr> : rows.length > 0 ? rows.map((row) => (
                 <tr key={row._id} className="hover:bg-blue-50/30">
                   <td className="p-2 text-blue-600 text-sm font-semibold">{row.questionSetId}</td><td className="p-2 text-xs font-semibold">{row.examName}</td>{hasStageInRows && <td className="p-2 text-xs font-semibold">{row.examStage || "---"}</td>}<td className="p-2 text-xs font-semibold">{row.categoryName}</td><td className="p-2 text-xs font-semibold">{row.subjectName}</td>{hasTopicInRows && <td className="p-2 text-xs font-semibold">{row.topicName || "---"}</td>}{hasTopicInRows && <td className="p-2 text-xs font-semibold">{row.subTopicName || "---"}</td>}<td className="p-2 text-xs font-semibold">{Array.isArray(row.questions) ? row.questions.length : 0}</td><td className="p-2 text-xs font-semibold">{row.status}</td>
-                  <td className="p-2 flex justify-center gap-2"><button onClick={() => handleView(row._id)} className="p-2 bg-slate-100 text-slate-600 rounded-xl"><Eye size={16} /></button><button onClick={() => handleEdit(row._id)} className="p-2 bg-blue-50 text-blue-600 rounded-xl"><Edit size={16} /></button><button onClick={() => handleDelete(row._id)} className="p-2 bg-red-50 text-red-400 rounded-xl"><Trash2 size={16} /></button></td>
+                  <td className="p-2 flex justify-center gap-2"><button onClick={() => handleView(row._id)} className="p-2 bg-slate-100 text-slate-600 rounded-xl"><Eye size={16} /></button><button onClick={() => navigate(`/dashboard/question-bank/${row._id}/edit`)} className="p-2 bg-blue-50 text-blue-600 rounded-xl"><Edit size={16} /></button><button onClick={() => handleDelete(row._id)} className="p-2 bg-red-50 text-red-400 rounded-xl"><Trash2 size={16} /></button></td>
                 </tr>
               )) : <tr><td colSpan={(hasStageInRows ? 1 : 0) + (hasTopicInRows ? 2 : 0) + 7} className="p-20 text-center text-slate-300 font-semibold">No Records</td></tr>}
             </tbody>

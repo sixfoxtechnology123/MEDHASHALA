@@ -7,12 +7,16 @@ import Dashboard from "./pages/Dashboard";
 import DashboardHome from "./pages/DashboardHome";
 import CategoryMaster from "./pages/CategoryMaster";
 import ExamMaster from "./pages/ExamMaster";
+import ExamForm from "./pages/ExamForm";
 import ExamView from "./pages/ExamView";
 import SyllabusMaster from "./pages/SyllabusMaster";
+import SyllabusForm from "./pages/SyllabusForm";
 import SyllabusView from "./pages/SyllabusView";
+import CategoryForm from "./pages/CategoryForm";
 import MockTest from "./pages/MockTest";
 import MockTestAttempt from "./pages/MockTestAttempt";
 import QuestionBank from "./pages/QuestionBank";
+import QuestionBankForm from "./pages/QuestionBankForm";
 import StudentDashboard from "./pages/StudentDashboard";
 import ProtectedRoute from "./routes/ProtectedRoute";
 
@@ -67,17 +71,25 @@ function App() {
 
           {/* Category */}
           <Route path="category-master" element={<CategoryMaster />} />
+          <Route path="category-master/new" element={<CategoryForm />} />
+          <Route path="category-master/:id/edit" element={<CategoryForm />} />
 
           {/* Exam Master */}
           <Route path="exam-master" element={<ExamMaster />} />
+          <Route path="exam-master/new" element={<ExamForm />} />
+          <Route path="exam-master/:id/edit" element={<ExamForm />} />
 
           {/* Exam View */}
           <Route path="exam-view" element={<ExamView />} />
 
           {/* Syllabus Master */}
           <Route path="syllabus-master" element={<SyllabusMaster />} />
+          <Route path="syllabus-master/new" element={<SyllabusForm />} />
+          <Route path="syllabus-master/:id/edit" element={<SyllabusForm />} />
           <Route path="syllabus-view/:syllabusId" element={<SyllabusView />} />
           <Route path="question-bank" element={<QuestionBank />} />
+          <Route path="question-bank/new" element={<QuestionBankForm />} />
+          <Route path="question-bank/:id/edit" element={<QuestionBankForm />} />
           <Route path="mock-test" element={<MockTest />} />
           <Route path="mock-test-attempt/:subjectId" element={<MockTestAttempt />} />
 

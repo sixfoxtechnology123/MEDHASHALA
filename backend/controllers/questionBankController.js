@@ -153,7 +153,7 @@ exports.getNextQuestionBankId = async (req, res) => {
 
 exports.getQuestionBank = async (req, res) => {
   try {
-    const { examMasterId, examCategoryId, subjectId, examStage, topicName, subTopicName, status, page = 1, limit = 10, search = "" } = req.query;
+    const { examMasterId, examCategoryId, subjectId, examStage, topicName, subTopicName, status, page = 1, limit = 10, search = "", flat = "" } = req.query;
     const filter = {};
     const toUpperList = (v) =>
       String(v || "")
@@ -187,12 +187,65 @@ exports.getQuestionBank = async (req, res) => {
     const safeLimit = Math.max(parseInt(limit, 10) || 10, 1);
     const skip = (safePage - 1) * safeLimit;
 
+    const isFlat = ["true", "1", "yes"].includes(String(flat || "").toLowerCase());
+
+    if (isFlat) {
+      const rows = await QuestionBank.find(filter).sort({ createdAt: 1 }).lean();
+      const flattened = rows.flatMap((set) =>
+        (Array.isArray(set.questions) ? set.questions : []).map((q, idx) => {
+          const qNo = String(q?.qNo || `Q${idx + 1}`).toUpperCase();
+          return {
+            questionBankId: `${String(set.questionSetId || "").toUpperCase()}::${qNo}`,
+            questionSetId: set.questionSetId,
+            qNo,
+            marks: q?.marks ?? null,
+            negativeMarks: q?.negativeMarks ?? null,
+            questionText: q?.questionText || "",
+            optionA: q?.optionA || "",
+            optionB: q?.optionB || "",
+            optionC: q?.optionC || "",
+            optionD: q?.optionD || "",
+            correctOption: q?.correctOption || "",
+            explanationText: q?.explanationText || "",
+            questionImages: Array.isArray(q?.questionImages) ? q.questionImages : [],
+            optionImages: q?.optionImages || { A: [], B: [], C: [], D: [] },
+            explanationImages: Array.isArray(q?.explanationImages) ? q.explanationImages : [],
+            examMasterId: set.examMasterId,
+            examCategoryId: set.examCategoryId,
+            subjectId: set.subjectId,
+            examStage: set.examStage,
+            topicName: set.topicName,
+            subTopicName: set.subTopicName,
+            examName: set.examName,
+            categoryName: set.categoryName,
+            subjectName: set.subjectName,
+            status: set.status,
+            createdAt: set.createdAt,
+          };
+        })
+      );
+
+      const total = flattened.length;
+      const sliced = flattened.slice(skip, skip + safeLimit);
+
+      return res.json({
+        success: true,
+        data: sliced,
+        pagination: {
+          page: safePage,
+          limit: safeLimit,
+          total,
+          totalPages: Math.max(Math.ceil(total / safeLimit), 1),
+        },
+      });
+    }
+
     const [rows, total] = await Promise.all([
       QuestionBank.find(filter).sort({ createdAt: 1 }).skip(skip).limit(safeLimit),
       QuestionBank.countDocuments(filter),
     ]);
 
-    res.json({
+    return res.json({
       success: true,
       data: rows,
       pagination: {

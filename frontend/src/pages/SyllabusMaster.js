@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   BookCopy,
   Edit,
@@ -18,6 +19,7 @@ const emptyTopic = { topicName: "", subTopicInput: "", subTopics: [] };
 const emptyBulkTopic = { topicName: "", subTopicInput: "", subTopics: [] };
 
 const SyllabusMaster = () => {
+  const navigate = useNavigate();
   const [exams, setExams] = useState([]);
   const [categories, setCategories] = useState([]);
   const [syllabusRows, setSyllabusRows] = useState([]);
@@ -305,56 +307,11 @@ const SyllabusMaster = () => {
   );
 
   const openAddModal = async () => {
-    setEditId(null);
-    try {
-      const idRes = await axios.get("/master/syllabus/next-id");
-      setFormData({
-        syllabusId: idRes.data?.nextId || "",
-        examId: "",
-        examStage: "",
-        categoryId: "",
-        subjectName: "",
-        status: "ACTIVE",
-        topics: [],
-      });
-      setCurrentTopic({ ...emptyTopic });
-      resetCopyState();
-      setIsModalOpen(true);
-    } catch {
-      toast.error("ID GENERATION FAILED");
-    }
+    navigate("/dashboard/syllabus-master/new");
   };
 
   const handleEdit = (row) => {
-    const exam = exams.find(
-      (ex) =>
-        String(ex._id) === String(row.examId) ||
-        String(ex.examCode || "").toUpperCase() === String(row.examCode || "").toUpperCase()
-    );
-
-    const cat = categories.find(
-      (c) =>
-        String(c._id) === String(row.categoryId) ||
-        (String(c.catId || "").toUpperCase() === String(row.catId || "").toUpperCase() &&
-          String(c.examCode || "").toUpperCase() === String(row.examCode || "").toUpperCase())
-    );
-
-    setEditId(row._id);
-    setFormData({
-      syllabusId: row.syllabusId,
-      examId: exam?._id || "",
-      examStage: row.examStage || cat?.examStage || "",
-      categoryId: cat?._id || "",
-      subjectName: row.subjectName || "",
-      status: row.status || "ACTIVE",
-      topics: (row.topics || []).map((t) => ({
-        topicName: t.topicName || "",
-        subTopics: t.subTopics || [],
-      })),
-    });
-    setCurrentTopic({ ...emptyTopic });
-    resetCopyState();
-    setIsModalOpen(true);
+    navigate(`/dashboard/syllabus-master/${row._id}/edit`);
   };
 
   const addSubTopicToCurrent = () => {

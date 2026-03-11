@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Layers, Hash, Save, CheckSquare, Square,
   Loader2, Edit, Trash2, Search, Plus, X, RefreshCw
@@ -7,6 +8,7 @@ import axios from "../api/axios";
 import toast from "react-hot-toast";
 
 const CategoryMaster = () => {
+  const navigate = useNavigate();
   const [exams, setExams] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -66,38 +68,11 @@ const CategoryMaster = () => {
   };
 
   const openAddForm = () => {
-    setEditId(null);
-    setFormData({ catId: "", examId: "", examStages: [], examStageInput: "", catName: "", features: [], status: "ACTIVE" });
-    fetchData();
-    setIsFormOpen(true);
+    navigate("/dashboard/category-master/new");
   };
 
   const handleEdit = (cat) => {
-    const matchedExam = exams.find(
-      (ex) =>
-        (cat.examCode && ex.examCode === cat.examCode) ||
-        (cat.examName && ex.examName === cat.examName) ||
-        String(cat.examId || "") === String(ex._id || "")
-    );
-
-    setEditId(cat._id);
-    const stages = Array.from(
-      new Set(
-        [ ...(Array.isArray(cat.examStages) ? cat.examStages : []), cat.examStage ]
-          .map((s) => String(s || "").trim().toUpperCase())
-          .filter(Boolean)
-      )
-    );
-    setFormData({
-      catId: cat.catId,
-      examId: matchedExam?._id || "",
-      examStages: stages,
-      examStageInput: "",
-      catName: cat.catName,
-      features: cat.features || [],
-      status: cat.status || "ACTIVE",
-    });
-    setIsFormOpen(true);
+    navigate(`/dashboard/category-master/${cat._id}/edit`);
   };
 
   const addExamStage = () => {

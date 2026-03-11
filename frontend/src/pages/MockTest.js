@@ -1,16 +1,11 @@
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Edit, FileText, Loader2, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 import axios from "../api/axios";
 
 const toastErrorOnce = (msg) => toast.error(msg, { id: "one-error" });
 const toastOkOnce = (msg) => toast.success(msg, { id: "one-success" });
-
-const nextBankId = (currentId) => {
-  const n = parseInt(String(currentId || "").replace("QSBANK", ""), 10);
-  return `QSBANK${(Number.isNaN(n) ? 0 : n) + 1}`;
-};
 
 const toggleInArray = (arr, value) => {
   const v = String(value || "").trim().toUpperCase();
@@ -41,8 +36,8 @@ const MultiCheck = ({ title, options, values, onToggle, disabled = false }) => (
 const QuestionInlineForm = ({ exams, categories, subjects, onSaved }) => {
   const [saving, setSaving] = useState(false);
   const [baseForm, setBaseForm] = useState({ examMasterId: "", examCategoryId: "", subjectId: "" });
+  const [questionSetId, setQuestionSetId] = useState("");
   const [questionForm, setQuestionForm] = useState({
-    questionBankId: "",
     marks: "",
     negativeMarks: "",
     questionText: "",
@@ -79,9 +74,9 @@ const QuestionInlineForm = ({ exams, categories, subjects, onSaved }) => {
   const loadId = async () => {
     try {
       const res = await axios.get("/master/question-bank/next-id");
-      setQuestionForm((prev) => ({ ...prev, questionBankId: res.data?.nextId || "QSBANK1" }));
+      setQuestionSetId(res.data?.nextId || "QSET1");
     } catch {
-      setQuestionForm((prev) => ({ ...prev, questionBankId: "QSBANK1" }));
+      setQuestionSetId("QSET1");
     }
   };
 
@@ -93,7 +88,6 @@ const QuestionInlineForm = ({ exams, categories, subjects, onSaved }) => {
     setDrafts((prev) => [...prev, { ...questionForm }]);
     setQuestionForm((prev) => ({
       ...prev,
-      questionBankId: nextBankId(prev.questionBankId),
       questionText: "",
       optionA: "",
       optionB: "",
@@ -109,9 +103,7 @@ const QuestionInlineForm = ({ exams, categories, subjects, onSaved }) => {
     if (!drafts.length) return toastErrorOnce("ADD AT LEAST ONE DRAFT");
     setSaving(true);
     try {
-      for (const q of drafts) {
-        await axios.post("/master/question-bank/upsert", { ...baseForm, ...q });
-      }
+      await axios.post("/master/question-bank/upsert", { questionSetId, ...baseForm, questions: drafts });
       toastOkOnce("DRAFT QUESTIONS SAVED");
       setDrafts([]);
       await loadId();
@@ -132,7 +124,7 @@ const QuestionInlineForm = ({ exams, categories, subjects, onSaved }) => {
         <select value={baseForm.subjectId} onChange={(e) => setBaseForm((p) => ({ ...p, subjectId: e.target.value }))} className="p-2 border border-slate-200 rounded-lg text-sm"><option value="">Subject</option>{filteredSubjects.map((sub) => <option key={sub.syllabusId} value={sub.syllabusId}>{sub.subjectName}</option>)}</select>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-        <div className="p-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-blue-700">{questionForm.questionBankId || "QSBANK..."}</div>
+        <div className="p-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-blue-700">{questionSetId || "QSET..."}</div>
         <input type="number" step="0.5" value={questionForm.marks} onChange={(e) => setQuestionForm((p) => ({ ...p, marks: e.target.value }))} placeholder="Marks" className="p-2 border border-slate-200 rounded-lg text-sm" />
         <input type="number" step="0.25" value={questionForm.negativeMarks} onChange={(e) => setQuestionForm((p) => ({ ...p, negativeMarks: e.target.value }))} placeholder="Negative" className="p-2 border border-slate-200 rounded-lg text-sm" />
       </div>
@@ -190,6 +182,18 @@ const MockTest = () => {
   const [questionFilter, setQuestionFilter] = useState({ marks: "", negativeMarks: "" });
   const [showOnlySetQuestions, setShowOnlySetQuestions] = useState(true);
   const richViewClass = "text-sm text-slate-800 leading-relaxed [&_table]:w-full [&_table]:border-collapse [&_table]:border [&_th]:border [&_td]:border [&_th]:p-1.5 [&_td]:p-1.5 [&_th]:bg-slate-100";
+  const listMathRef = useRef(null);
+  const paperMathRef = useRef(null);
+
+  const typesetMath = (root) => {
+    if (!root) return;
+    if (!window.MathJax || !window.MathJax.typesetPromise) {
+      setTimeout(() => typesetMath(root), 200);
+      return;
+    }
+    if (window.MathJax.typesetClear) window.MathJax.typesetClear([root]);
+    window.MathJax.typesetPromise([root]);
+  };
 
   const hasSetStage = useMemo(
     () => sets.some((row) => String(row.examStage || "").trim() || (Array.isArray(row.examStages) && row.examStages.length)),
@@ -378,10 +382,19 @@ const MockTest = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.examMasterId, filters.examStage, filters.examCategoryId, filters.subjectId, pagination.page]);
 
+  useEffect(() => {
+    typesetMath(listMathRef.current);
+  }, [questionBankRows]);
+
+  useEffect(() => {
+    if (showPaperView) typesetMath(paperMathRef.current);
+  }, [showPaperView, paperQuestions]);
+
   const fetchQuestionBankRows = async () => {
     if (!form.subjectIds.length) return setQuestionBankRows([]);
     try {
       const params = new URLSearchParams();
+      params.set("flat", "true");
       params.set("status", "ACTIVE");
       params.set("page", "1");
       params.set("limit", "1000");
@@ -567,7 +580,7 @@ const MockTest = () => {
       {showQuickQuestionForm && <section className="px-3 pb-3"><QuestionInlineForm exams={exams} categories={categories} subjects={subjects} onSaved={fetchQuestionBankRows} /></section>}
 
       {showPaperView && (
-      <section className="px-3 pb-3">
+      <section className="px-3 pb-3" ref={paperMathRef}>
         <div className="bg-white rounded-2xl border border-sky-100 shadow-sm p-4 space-y-4">
           <div className="flex items-center justify-between">
             <div>
@@ -594,8 +607,8 @@ const MockTest = () => {
                     <div>Marks: <span className="font-semibold text-slate-800">{q.marks ?? "--"}</span> | Neg: <span className="font-semibold text-slate-800">{q.negativeMarks ?? "--"}</span></div>
                   </div>
 
-                  <div className={richViewClass}>
-                    {q.questionText ? <div dangerouslySetInnerHTML={{ __html: q.questionText }} /> : <span className="text-slate-400">---</span>}
+                  <div className={`${richViewClass} whitespace-pre-wrap`}>
+                    {q.questionText || "---"}
                   </div>
 
                   {(Array.isArray(q.questionImages) ? q.questionImages : []).length > 0 && (
@@ -610,8 +623,8 @@ const MockTest = () => {
                     {["A", "B", "C", "D"].map((opt) => (
                       <div key={`${idx}-${opt}`} className="rounded-xl border border-slate-100 p-3">
                         <div className="text-xs font-semibold text-slate-600 mb-1">Option {opt}</div>
-                        <div className={richViewClass}>
-                          {q[`option${opt}`] ? <div dangerouslySetInnerHTML={{ __html: q[`option${opt}`] }} /> : <span className="text-slate-400">---</span>}
+                        <div className={`${richViewClass} whitespace-pre-wrap`}>
+                          {q[`option${opt}`] || "---"}
                         </div>
                         {(Array.isArray(q.optionImages?.[opt]) ? q.optionImages?.[opt] : []).length > 0 && (
                           <div className="mt-2 flex flex-wrap gap-2">
@@ -628,9 +641,9 @@ const MockTest = () => {
                     Correct Answer: <span className="text-slate-900">{q.correctOption || "--"}</span>
                   </div>
 
-                  <div className={richViewClass}>
+                  <div className={`${richViewClass} whitespace-pre-wrap`}>
                     <div className="text-xs font-semibold text-slate-600 mb-1">Explanation</div>
-                    {q.explanationText ? <div dangerouslySetInnerHTML={{ __html: q.explanationText }} /> : <span className="text-slate-400">---</span>}
+                    {q.explanationText || "---"}
                   </div>
 
                   {(Array.isArray(q.explanationImages) ? q.explanationImages : []).length > 0 && (
@@ -672,7 +685,7 @@ const MockTest = () => {
             {!editId ? <div className="grid grid-cols-2 gap-2"><select value={form.selectionType} onChange={(e) => setForm((p) => ({ ...p, selectionType: e.target.value, questionIds: [] }))} className="p-2 border border-slate-200 rounded-lg text-xs"><option value="AUTO">AUTO</option><option value="MANUAL">MANUAL</option></select><input type="number" min="1" value={form.questionCount} onChange={(e) => setForm((p) => ({ ...p, questionCount: Number(e.target.value) }))} className="p-2 border border-slate-200 rounded-lg text-xs" /></div> : <button type="button" onClick={async () => { if (showOnlySetQuestions) { await fetchQuestionBankRows(); setShowOnlySetQuestions(false); } else { const res = await axios.get(`/master/mock-test/set/${editId}`); const row = res.data?.data; setQuestionBankRows(Array.isArray(row?.questionDetails) ? row.questionDetails : []); setShowOnlySetQuestions(true); } }} className="px-3 py-2 bg-slate-100 text-slate-700 text-xs rounded-lg">{showOnlySetQuestions ? "Show Filtered Questions" : "Show Set Questions"}</button>}
           </div>
           {!editId && form.selectionType === "AUTO" && <button type="button" onClick={() => autoPickQuestions(false)} className="px-3 py-2 bg-indigo-600 text-white text-xs rounded-lg">Auto Pick Next Questions</button>}
-          <div className="border border-slate-200 rounded-xl overflow-hidden"><div className="max-h-[42vh] overflow-auto"><table className="w-full text-left"><thead><tr className="bg-slate-100 text-slate-700 text-xs font-semibold"><th className="p-2">Select</th><th className="p-2">Q.ID</th><th className="p-2">Question</th><th className="p-2">Marks</th><th className="p-2">Neg</th></tr></thead><tbody>{questionBankRows.map((q) => { const qbId = q.questionBankId || q._id; const checked = form.questionIds.includes(qbId); return <tr key={qbId} className="border-t border-slate-100"><td className="p-2"><input type="checkbox" checked={checked} onChange={() => setForm((prev) => ({ ...prev, questionIds: checked ? prev.questionIds.filter((x) => x !== qbId) : [...prev.questionIds, qbId] }))} disabled={isViewOnly || (!editId && form.selectionType === "AUTO")} /></td><td className="p-2 text-xs font-semibold text-blue-700">{q.questionBankId}</td><td className="p-2 text-xs">{q.questionText}</td><td className="p-2 text-xs">{q.marks}</td><td className="p-2 text-xs">{q.negativeMarks}</td></tr>; })}{questionBankRows.length === 0 && <tr><td colSpan="5" className="p-6 text-center text-xs text-slate-400">No questions found for selected filters.</td></tr>}</tbody></table></div></div>
+          <div className="border border-slate-200 rounded-xl overflow-hidden" ref={listMathRef}><div className="max-h-[42vh] overflow-auto"><table className="w-full text-left"><thead><tr className="bg-slate-100 text-slate-700 text-xs font-semibold"><th className="p-2">Select</th><th className="p-2">Q.ID</th><th className="p-2">Question</th><th className="p-2">Marks</th><th className="p-2">Neg</th></tr></thead><tbody>{questionBankRows.map((q) => { const qbId = q.questionBankId || q._id; const checked = form.questionIds.includes(qbId); return <tr key={qbId} className="border-t border-slate-100"><td className="p-2"><input type="checkbox" checked={checked} onChange={() => setForm((prev) => ({ ...prev, questionIds: checked ? prev.questionIds.filter((x) => x !== qbId) : [...prev.questionIds, qbId] }))} disabled={isViewOnly || (!editId && form.selectionType === "AUTO")} /></td><td className="p-2 text-xs font-semibold text-blue-700">{q.questionBankId}</td><td className="p-2 text-xs whitespace-pre-wrap">{q.questionText}</td><td className="p-2 text-xs">{q.marks}</td><td className="p-2 text-xs">{q.negativeMarks}</td></tr>; })}{questionBankRows.length === 0 && <tr><td colSpan="5" className="p-6 text-center text-xs text-slate-400">No questions found for selected filters.</td></tr>}</tbody></table></div></div>
           <div className="flex items-center justify-between"><p className="text-xs font-semibold text-slate-600">Selected Questions: {form.questionIds.length}</p>{!isViewOnly && <button disabled={saving} className="px-5 py-2 bg-slate-900 text-white rounded-xl flex items-center gap-2 text-sm">{saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}{editId ? "Update Set" : "Create Set"}</button>}</div>
         </form>
       </section>
